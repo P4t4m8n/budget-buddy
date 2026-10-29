@@ -3,14 +3,13 @@ import MonthlyOverviewChart from "@/components/dashboard/MonthlyOverviewChart";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import SpendingByCategoryChart from "@/components/dashboard/SpendingByCategoryChart";
 import SummaryCard from "@/components/dashboard/SummaryCard";
+import { CURRENT_MONTH } from "@/lib/constants";
 import { formatCurrency } from "@/lib/format";
 import {
   categories,
   savingsGoals,
   transactions,
 } from "@/lib/mock-data";
-
-const CURRENT_MONTH = "2026-10";
 
 const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
 
