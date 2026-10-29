@@ -7,6 +7,11 @@ const ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 
 export class GoogleAuthError extends Error {}
 
+// Must match the redirect URI registered in Google Cloud exactly
+export function googleRedirectUri(origin: string) {
+  return `${origin}/api/auth/callback/google`;
+}
+
 export type GoogleProfile = {
   sub: string;
   email: string;
