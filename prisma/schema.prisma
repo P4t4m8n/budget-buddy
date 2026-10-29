@@ -9,3 +9,165 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Currency {
+  ILS
+  EUR
+  USD
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum InvestmentType {
+  STOCK
+  ETF
+  CRYPTO
+  BOND
+  OTHER
+}
+
+enum WishlistPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum WishlistStatus {
+  WANTED
+  SAVING
+  PURCHASED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  categories          Category[]
+  transactions        Transaction[]
+  budgets             Budget[]
+  savingsGoals        SavingsGoal[]
+  savingsDeposits     SavingsDeposit[]
+  investments         Investment[]
+  investmentSnapshots InvestmentSnapshot[]
+  wishlistItems       WishlistItem[]
+}
+
+model Category {
+  id     String          @id @default(cuid())
+  userId String
+  name   String
+  type   TransactionType
+  color  String
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([userId, name, type])
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  userId      String
+  categoryId  String
+  description String
+  amount      Decimal         @db.Decimal(12, 2)
+  currency    Currency        @default(ILS)
+  type        TransactionType
+  date        DateTime        @db.Date
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([userId, date])
+  @@index([categoryId])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  userId     String
+  categoryId String
+  month      DateTime @db.Date // first day of the month
+  limit      Decimal  @db.Decimal(12, 2)
+  currency   Currency @default(ILS)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, categoryId, month])
+}
+
+model SavingsGoal {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  targetAmount Decimal   @db.Decimal(12, 2)
+  currency     Currency  @default(ILS)
+  targetDate   DateTime? @db.Date
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deposits SavingsDeposit[]
+}
+
+model SavingsDeposit {
+  id     String   @id @default(cuid())
+  userId String
+  goalId String
+  amount Decimal  @db.Decimal(12, 2) // negative = withdrawal
+  date   DateTime @db.Date
+  note   String?
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, date])
+}
+
+model Investment {
+  id             String         @id @default(cuid())
+  userId         String
+  name           String
+  type           InvestmentType
+  ticker         String?
+  amountInvested Decimal        @db.Decimal(12, 2)
+  currentValue   Decimal        @db.Decimal(12, 2)
+  currency       Currency       @default(ILS)
+  purchaseDate   DateTime       @db.Date
+
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots InvestmentSnapshot[]
+}
+
+model InvestmentSnapshot {
+  id           String   @id @default(cuid())
+  userId       String
+  investmentId String
+  value        Decimal  @db.Decimal(12, 2)
+  date         DateTime @db.Date
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@unique([investmentId, date])
+}
+
+model WishlistItem {
+  id       String           @id @default(cuid())
+  userId   String
+  name     String
+  price    Decimal          @db.Decimal(12, 2)
+  currency Currency         @default(ILS)
+  priority WishlistPriority
+  status   WishlistStatus
+  url      String?
+  notes    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
