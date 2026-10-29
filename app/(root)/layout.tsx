@@ -1,3 +1,4 @@
+import Providers from "@/providers/providers";
 
 export default function MainLayout({
   children,
@@ -5,6 +6,8 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="flex-1 overflow-x-hidden p-6 lg:p-8">{children}</main>
+    <Providers>
+      <main className="flex-1 overflow-x-hidden p-6 lg:p-8">{children}</main>
+    </Providers>
   );
 }
