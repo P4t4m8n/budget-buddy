@@ -41,11 +41,14 @@ enum WishlistStatus {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  image        String?
+  googleIdHash String   @unique // HMAC-SHA256 of Google's `sub`; the raw id is never stored
+  createdAt    DateTime @default(now())
 
+  sessions            Session[]
   categories          Category[]
   transactions        Transaction[]
   budgets             Budget[]
@@ -54,6 +57,19 @@ model User {
   investments         Investment[]
   investmentSnapshots InvestmentSnapshot[]
   wishlistItems       WishlistItem[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique // SHA-256 of the cookie token; the raw token is never stored
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Category {
