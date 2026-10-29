@@ -1,0 +1,9 @@
+import type { Investment } from "@/types/finance";
+
+export const investments: Investment[] = [
+  { id: "i-001", name: "S&P 500 ETF", type: "etf", ticker: "VOO", amountInvested: 8000, currentValue: 9150, purchaseDate: "2025-03-10" },
+  { id: "i-002", name: "World Index ETF", type: "etf", ticker: "VWRL", amountInvested: 5000, currentValue: 5420, purchaseDate: "2025-09-15" },
+  { id: "i-003", name: "Apple", type: "stock", ticker: "AAPL", amountInvested: 2000, currentValue: 2480, purchaseDate: "2024-11-05" },
+  { id: "i-004", name: "Bitcoin", type: "crypto", ticker: "BTC", amountInvested: 1500, currentValue: 1320, purchaseDate: "2026-01-20" },
+  { id: "i-005", name: "Government bonds", type: "bond", amountInvested: 3000, currentValue: 3090, purchaseDate: "2026-02-01" },
+];
