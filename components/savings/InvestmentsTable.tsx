@@ -2,6 +2,7 @@
 
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { formatCurrency } from "@/lib/format";
+import { investmentTypeLabels } from "@/lib/labels";
 import type { Currency, InvestmentType } from "@/types/finance";
 
 export type InvestmentRow = {
@@ -21,7 +22,12 @@ const money = (value: number, row: InvestmentRow) =>
 const columns: GridColDef<InvestmentRow>[] = [
   { field: "name", headerName: "Name", flex: 1, minWidth: 180 },
   { field: "ticker", headerName: "Ticker", width: 100 },
-  { field: "type", headerName: "Type", width: 100 },
+  {
+    field: "type",
+    headerName: "Type",
+    width: 100,
+    valueFormatter: (value: InvestmentType) => investmentTypeLabels[value],
+  },
   {
     field: "amountInvested",
     headerName: "Invested",

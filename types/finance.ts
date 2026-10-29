@@ -1,66 +1,44 @@
-export type TransactionType = "income" | "expense";
+import type { Decimal } from "@prisma/client/runtime/client";
+import type {
+  Budget as DbBudget,
+  Category as DbCategory,
+  Investment as DbInvestment,
+  InvestmentSnapshot as DbInvestmentSnapshot,
+  SavingsDeposit as DbSavingsDeposit,
+  SavingsGoal as DbSavingsGoal,
+  Transaction as DbTransaction,
+  WishlistItem as DbWishlistItem,
+} from "@/generated/prisma/browser";
 
-// ISO 4217 codes. Only ILS is used for now; EUR and USD arrive with the conversion API.
-export type Currency = "ILS" | "EUR" | "USD";
+export {
+  Currency,
+  InvestmentType,
+  TransactionType,
+  WishlistPriority,
+  WishlistStatus,
+} from "@/generated/prisma/enums";
 
-export type Category = {
-  id: string;
-  name: string;
-  type: TransactionType;
-  color: string;
+// Prisma returns Decimal and Date, which can't be passed from server to client
+// components. These are the same models with Decimal -> number and Date -> ISO string.
+type Serialized<T> = {
+  [K in keyof T]: T[K] extends Decimal
+    ? number
+    : T[K] extends Decimal | null
+      ? number | null
+      : T[K] extends Date
+        ? string
+        : T[K] extends Date | null
+          ? string | null
+          : T[K];
 };
 
-export type Transaction = {
-  id: string;
-  description: string;
-  amount: number;
-  currency: Currency;
-  type: TransactionType;
-  categoryId: string;
-  date: string; // ISO date, e.g. "2026-10-05"
-  note?: string;
-};
+type UiModel<T> = Serialized<Omit<T, "userId" | "createdAt">>;
 
-export type Budget = {
-  id: string;
-  categoryId: string;
-  month: string; // "YYYY-MM"
-  limit: number;
-  currency: Currency;
-};
-
-export type SavingsGoal = {
-  id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  currency: Currency;
-  targetDate?: string;
-};
-
-export type InvestmentType = "stock" | "etf" | "crypto" | "bond" | "other";
-
-export type Investment = {
-  id: string;
-  name: string;
-  type: InvestmentType;
-  ticker?: string;
-  amountInvested: number;
-  currentValue: number;
-  currency: Currency;
-  purchaseDate: string;
-};
-
-export type WishlistPriority = "low" | "medium" | "high";
-export type WishlistStatus = "wanted" | "saving" | "purchased";
-
-export type WishlistItem = {
-  id: string;
-  name: string;
-  price: number;
-  currency: Currency;
-  priority: WishlistPriority;
-  status: WishlistStatus;
-  url?: string;
-  notes?: string;
-};
+export type Category = UiModel<DbCategory>;
+export type Transaction = UiModel<DbTransaction>;
+export type Budget = UiModel<DbBudget>;
+export type SavingsGoal = UiModel<DbSavingsGoal>;
+export type SavingsDeposit = UiModel<DbSavingsDeposit>;
+export type Investment = UiModel<DbInvestment>;
+export type InvestmentSnapshot = UiModel<DbInvestmentSnapshot>;
+export type WishlistItem = UiModel<DbWishlistItem>;

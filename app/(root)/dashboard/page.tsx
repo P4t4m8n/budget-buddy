@@ -7,7 +7,7 @@ import { CURRENT_MONTH } from "@/lib/constants";
 import { formatCurrency } from "@/lib/format";
 import {
   categories,
-  savingsGoals,
+  savingsDeposits,
   transactions,
 } from "@/lib/mock-data";
 
@@ -18,18 +18,18 @@ export default function DashboardPage() {
     t.date.startsWith(CURRENT_MONTH),
   );
   const income = sum(
-    monthTransactions.filter((t) => t.type === "income").map((t) => t.amount),
+    monthTransactions.filter((t) => t.type === "INCOME").map((t) => t.amount),
   );
   const spending = sum(
-    monthTransactions.filter((t) => t.type === "expense").map((t) => t.amount),
+    monthTransactions.filter((t) => t.type === "EXPENSE").map((t) => t.amount),
   );
-  const totalSaved = sum(savingsGoals.map((g) => g.currentAmount));
+  const totalSaved = sum(savingsDeposits.map((d) => d.amount));
   const balance =
-    sum(transactions.filter((t) => t.type === "income").map((t) => t.amount)) -
-    sum(transactions.filter((t) => t.type === "expense").map((t) => t.amount));
+    sum(transactions.filter((t) => t.type === "INCOME").map((t) => t.amount)) -
+    sum(transactions.filter((t) => t.type === "EXPENSE").map((t) => t.amount));
 
   const spendingByCategory = categories
-    .filter((c) => c.type === "expense")
+    .filter((c) => c.type === "EXPENSE")
     .map((c) => ({
       id: c.id,
       label: c.name,
@@ -47,8 +47,8 @@ export default function DashboardPage() {
     const inMonth = transactions.filter((t) => t.date.startsWith(month));
     return {
       month,
-      income: sum(inMonth.filter((t) => t.type === "income").map((t) => t.amount)),
-      expenses: sum(inMonth.filter((t) => t.type === "expense").map((t) => t.amount)),
+      income: sum(inMonth.filter((t) => t.type === "INCOME").map((t) => t.amount)),
+      expenses: sum(inMonth.filter((t) => t.type === "EXPENSE").map((t) => t.amount)),
     };
   });
 

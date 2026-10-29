@@ -1,7 +1,14 @@
 import { formatCurrency } from "@/lib/format";
 import type { SavingsGoal } from "@/types/finance";
 
-export default function SavingsGoalCard({ goal }: { goal: SavingsGoal }) {
+// currentAmount isn't stored; it's the sum of the goal's SavingsDeposit rows
+export type SavingsGoalProgress = SavingsGoal & { currentAmount: number };
+
+export default function SavingsGoalCard({
+  goal,
+}: {
+  goal: SavingsGoalProgress;
+}) {
   const percent = Math.min(goal.currentAmount / goal.targetAmount, 1) * 100;
 
   return (

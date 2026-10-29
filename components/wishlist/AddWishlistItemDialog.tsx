@@ -7,17 +7,13 @@ import FormField, { inputClass } from "@/components/ui/FormField";
 import SelectField from "@/components/ui/SelectField";
 import { BASE_CURRENCY } from "@/lib/constants";
 
-const priorityOptions = [
-  { value: "high", label: "High" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
-];
+import { wishlistPriorityLabels, wishlistStatusLabels } from "@/lib/labels";
 
-const statusOptions = [
-  { value: "wanted", label: "Wanted" },
-  { value: "saving", label: "Saving for it" },
-  { value: "purchased", label: "Purchased" },
-];
+const toOptions = (labels: Record<string, string>) =>
+  Object.entries(labels).map(([value, label]) => ({ value, label }));
+
+const priorityOptions = toOptions(wishlistPriorityLabels);
+const statusOptions = toOptions(wishlistStatusLabels);
 
 export default function AddWishlistItemDialog() {
   const [open, setOpen] = useState(false);
@@ -53,14 +49,14 @@ export default function AddWishlistItemDialog() {
           <FormField label="Priority">
             <SelectField
               name="priority"
-              defaultValue="medium"
+              defaultValue="MEDIUM"
               options={priorityOptions}
             />
           </FormField>
           <FormField label="Status">
             <SelectField
               name="status"
-              defaultValue="wanted"
+              defaultValue="WANTED"
               options={statusOptions}
             />
           </FormField>

@@ -5,7 +5,7 @@ import InvestmentsChart from "@/components/savings/InvestmentsChart";
 import InvestmentsTable from "@/components/savings/InvestmentsTable";
 import SavingsGoalCard from "@/components/savings/SavingsGoalCard";
 import { formatCurrency } from "@/lib/format";
-import { investments, savingsGoals } from "@/lib/mock-data";
+import { investments, savingsDeposits, savingsGoals } from "@/lib/mock-data";
 
 const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
 
@@ -21,7 +21,14 @@ export default function SavingsPage() {
     gainPercent: ((i.currentValue - i.amountInvested) / i.amountInvested) * 100,
   }));
 
-  const totalSaved = sum(savingsGoals.map((g) => g.currentAmount));
+  const goals = savingsGoals.map((goal) => ({
+    ...goal,
+    currentAmount: sum(
+      savingsDeposits.filter((d) => d.goalId === goal.id).map((d) => d.amount),
+    ),
+  }));
+
+  const totalSaved = sum(goals.map((g) => g.currentAmount));
   const totalInvested = sum(rows.map((r) => r.amountInvested));
   const portfolioValue = sum(rows.map((r) => r.currentValue));
   const gain = portfolioValue - totalInvested;
@@ -51,7 +58,7 @@ export default function SavingsPage() {
 
       <h2 className="mt-8 mb-4 text-lg font-semibold">Savings goals</h2>
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {savingsGoals.map((goal) => (
+        {goals.map((goal) => (
           <SavingsGoalCard key={goal.id} goal={goal} />
         ))}
       </section>

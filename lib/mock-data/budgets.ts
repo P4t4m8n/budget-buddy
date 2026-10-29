@@ -11,7 +11,8 @@ const monthlyLimits: Record<string, number> = {
   "cat-shopping": 400,
 };
 
-export const budgets: Budget[] = ["2026-08", "2026-09", "2026-10"].flatMap(
+// Budget.month is the first day of the month
+export const budgets: Budget[] = ["2026-08-01", "2026-09-01", "2026-10-01"].flatMap(
   (month) =>
     Object.entries(monthlyLimits).map(([categoryId, limit]) => ({
       id: `b-${month}-${categoryId}`,

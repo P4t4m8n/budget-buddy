@@ -9,13 +9,13 @@ import { budgets, categories, transactions } from "@/lib/mock-data";
 
 export default function BudgetPage() {
   const rows = budgets
-    .filter((b) => b.month === CURRENT_MONTH)
+    .filter((b) => b.month.startsWith(CURRENT_MONTH))
     .map((b) => {
       const category = categories.find((c) => c.id === b.categoryId);
       const spent = transactions
         .filter(
           (t) =>
-            t.type === "expense" &&
+            t.type === "EXPENSE" &&
             t.categoryId === b.categoryId &&
             t.date.startsWith(CURRENT_MONTH),
         )

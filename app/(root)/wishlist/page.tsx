@@ -8,9 +8,9 @@ import { wishlistItems } from "@/lib/mock-data";
 const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
 
 export default function WishlistPage() {
-  const open = wishlistItems.filter((i) => i.status !== "purchased");
-  const purchased = wishlistItems.filter((i) => i.status === "purchased");
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const open = wishlistItems.filter((i) => i.status !== "PURCHASED");
+  const purchased = wishlistItems.filter((i) => i.status === "PURCHASED");
+  const priorityOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
   const sortedOpen = [...open].sort(
     (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
   );

@@ -6,9 +6,10 @@ import Button from "@/components/ui/Button";
 import FormField, { inputClass } from "@/components/ui/FormField";
 import SelectField from "@/components/ui/SelectField";
 import { BASE_CURRENCY } from "@/lib/constants";
+import { transactionTypeLabels } from "@/lib/labels";
 import type { Category, TransactionType } from "@/types/finance";
 
-const types: TransactionType[] = ["expense", "income"];
+const types: TransactionType[] = ["EXPENSE", "INCOME"];
 
 export default function AddTransactionDialog({
   categories,
@@ -16,7 +17,7 @@ export default function AddTransactionDialog({
   categories: Category[];
 }) {
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState<TransactionType>("expense");
+  const [type, setType] = useState<TransactionType>("EXPENSE");
 
   const categoryOptions = categories
     .filter((c) => c.type === type)
@@ -43,13 +44,13 @@ export default function AddTransactionDialog({
                 type="button"
                 aria-pressed={type === t}
                 onClick={() => setType(t)}
-                className={`rounded-md py-1.5 text-sm font-medium capitalize transition-colors ${
+                className={`rounded-md py-1.5 text-sm font-medium transition-colors ${
                   type === t
                     ? "bg-emerald-500 text-neutral-950"
                     : "text-neutral-400 hover:text-neutral-100"
                 }`}
               >
-                {t}
+                {transactionTypeLabels[t]}
               </button>
             ))}
           </div>

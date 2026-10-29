@@ -23,10 +23,10 @@ export default function RecentTransactions({
           </div>
           <span
             className={`text-sm font-semibold ${
-              t.type === "income" ? "text-emerald-400" : "text-red-400"
+              t.type === "INCOME" ? "text-emerald-400" : "text-red-400"
             }`}
           >
-            {t.type === "income" ? "+" : "-"}
+            {t.type === "INCOME" ? "+" : "-"}
             {formatCurrency(t.amount, t.currency)}
           </span>
         </li>

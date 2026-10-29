@@ -5,6 +5,7 @@ import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import FormField, { inputClass } from "@/components/ui/FormField";
 import SelectField from "@/components/ui/SelectField";
 import { formatCurrency } from "@/lib/format";
+import { transactionTypeLabels } from "@/lib/labels";
 import type { Category, Currency, TransactionType } from "@/types/finance";
 
 export type TransactionRow = {
@@ -28,9 +29,9 @@ const columns: GridColDef<TransactionRow>[] = [
     width: 110,
     renderCell: ({ value }) => (
       <span
-        className={value === "income" ? "text-emerald-400" : "text-red-400"}
+        className={value === "INCOME" ? "text-emerald-400" : "text-red-400"}
       >
-        {value}
+        {transactionTypeLabels[value as TransactionType]}
       </span>
     ),
   },
@@ -85,8 +86,8 @@ export default function TransactionsTable({
               onChange={(v) => setType(v as "all" | TransactionType)}
               options={[
                 { value: "all", label: "All" },
-                { value: "income", label: "Income" },
-                { value: "expense", label: "Expense" },
+                { value: "INCOME", label: transactionTypeLabels.INCOME },
+                { value: "EXPENSE", label: transactionTypeLabels.EXPENSE },
               ]}
             />
           </FormField>
