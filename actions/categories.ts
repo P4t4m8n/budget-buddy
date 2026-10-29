@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import {
   createCategory,
   deleteCategory,
@@ -16,45 +15,26 @@ import {
   categoryInputSchema,
   categoryUpdateSchema,
 } from "@/lib/validation/category";
+import {
+  readFormValues,
+  validationFailure,
+  type FormState,
+} from "@/lib/validation/form";
 
-type Field = "name" | "type" | "color";
+const FIELDS = ["name", "type", "color"] as const;
+type Field = (typeof FIELDS)[number];
 
-export type CategoryFormState = {
-  status: "idle" | "success" | "error";
-  message?: string;
-  fieldErrors?: Partial<Record<Field, string>>;
-  // Sent back so the form can refill itself: React clears uncontrolled fields after an action
-  values?: Record<Field, string>;
-};
+export type CategoryFormState = FormState<Field>;
 
 export type DeleteCategoryResult =
   | { ok: true }
   | { ok: false; reason: "in_use"; transactions: number; budgets: number }
   | { ok: false; reason: "not_found" };
 
-const text = (formData: FormData, key: string) => {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
-};
-
-const readValues = (formData: FormData) => ({
-  name: text(formData, "name"),
-  type: text(formData, "type"),
-  color: text(formData, "color"),
-});
-
-function validationError(
-  error: z.ZodError,
-  values: Record<Field, string>,
-): CategoryFormState {
-  const { fieldErrors: flat } = z.flattenError(error) as {
-    fieldErrors: Record<string, string[] | undefined>;
-  };
-  const fieldErrors: CategoryFormState["fieldErrors"] = {};
-  for (const [field, messages] of Object.entries(flat)) {
-    if (messages?.[0]) fieldErrors[field as Field] = messages[0];
-  }
-  return { status: "error", fieldErrors, values };
+// A category shows up on the transactions page too (names, filter, form)
+function refreshCategoryPages() {
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
 }
 
 // Expected failures become messages for the form; anything else (including the
@@ -83,9 +63,9 @@ export async function createCategoryAction(
   _previous: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const values = readValues(formData);
+  const values = readFormValues(formData, FIELDS);
   const parsed = categoryInputSchema.safeParse(values);
-  if (!parsed.success) return validationError(parsed.error, values);
+  if (!parsed.success) return validationFailure(parsed.error, values);
 
   try {
     await createCategory(parsed.data);
@@ -93,7 +73,7 @@ export async function createCategoryAction(
     return failure(error, values);
   }
 
-  revalidatePath("/categories");
+  refreshCategoryPages();
   return { status: "success" };
 }
 
@@ -103,9 +83,9 @@ export async function updateCategoryAction(
   _previous: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const values = readValues(formData);
+  const values = readFormValues(formData, FIELDS);
   const parsed = categoryUpdateSchema.safeParse(values);
-  if (!parsed.success) return validationError(parsed.error, values);
+  if (!parsed.success) return validationFailure(parsed.error, values);
 
   try {
     await updateCategory(id, parsed.data);
@@ -113,7 +93,7 @@ export async function updateCategoryAction(
     return failure(error, values);
   }
 
-  revalidatePath("/categories");
+  refreshCategoryPages();
   return { status: "success" };
 }
 
@@ -141,6 +121,6 @@ export async function deleteCategoryAction(
     throw error;
   }
 
-  revalidatePath("/categories");
+  refreshCategoryPages();
   return { ok: true };
 }

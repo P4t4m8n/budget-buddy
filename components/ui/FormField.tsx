@@ -3,14 +3,19 @@ export const inputClass =
 
 export default function FormField({
   label,
+  labelId,
   children,
 }: {
   label: string;
+  // Lets a custom control (the MUI select) name itself with this label
+  labelId?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-neutral-400">{label}</span>
+      <span id={labelId} className="text-xs font-medium text-neutral-400">
+        {label}
+      </span>
       {children}
     </label>
   );

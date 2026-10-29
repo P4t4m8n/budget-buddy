@@ -11,6 +11,8 @@ export default function SelectField({
   value,
   defaultValue,
   placeholder,
+  labelId,
+  error,
   onChange,
 }: {
   name?: string;
@@ -18,6 +20,9 @@ export default function SelectField({
   value?: string;
   defaultValue?: string;
   placeholder?: string;
+  // id of the element that labels this control (see FormField's labelId)
+  labelId?: string;
+  error?: boolean;
   onChange?: (value: string) => void;
 }) {
   return (
@@ -26,6 +31,8 @@ export default function SelectField({
       fullWidth
       displayEmpty
       name={name}
+      labelId={labelId}
+      error={error}
       value={value}
       defaultValue={value === undefined ? (defaultValue ?? "") : undefined}
       onChange={(e) => onChange?.(e.target.value)}

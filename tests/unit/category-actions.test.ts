@@ -36,7 +36,7 @@ const valid = { name: "Groceries", type: "EXPENSE", color: "#F59E0B" };
 beforeEach(() => vi.resetAllMocks());
 
 describe("createCategoryAction", () => {
-  it("creates the category from cleaned-up input and refreshes the list", async () => {
+  it("creates the category from cleaned-up input and refreshes the pages that show it", async () => {
     const result = await createCategoryAction(idle, form({ ...valid, name: "  Groceries " }));
 
     expect(result).toEqual({ status: "success" });
@@ -46,6 +46,8 @@ describe("createCategoryAction", () => {
       color: "#f59e0b",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/categories");
+    // Categories appear on the transactions page too: names, filter and form
+    expect(revalidatePath).toHaveBeenCalledWith("/transactions");
   });
 
   it("never lets the client choose the owner", async () => {
@@ -128,6 +130,8 @@ describe("updateCategoryAction", () => {
     expect(result).toEqual({ status: "success" });
     expect(updateCategory).toHaveBeenCalledWith("cat-1", { name: "Food", color: "#10b981" });
     expect(revalidatePath).toHaveBeenCalledWith("/categories");
+    // A rename changes the category names shown on the transactions page
+    expect(revalidatePath).toHaveBeenCalledWith("/transactions");
   });
 
   it("ignores an attempt to change the type", async () => {
@@ -170,10 +174,11 @@ describe("updateCategoryAction", () => {
 });
 
 describe("deleteCategoryAction", () => {
-  it("deletes and refreshes the list", async () => {
+  it("deletes and refreshes the pages that show categories", async () => {
     expect(await deleteCategoryAction("cat-1")).toEqual({ ok: true });
     expect(deleteCategory).toHaveBeenCalledWith("cat-1");
     expect(revalidatePath).toHaveBeenCalledWith("/categories");
+    expect(revalidatePath).toHaveBeenCalledWith("/transactions");
   });
 
   it("reports what still uses the category", async () => {

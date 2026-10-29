@@ -12,7 +12,8 @@ export function formatCurrency(
     formatter = new Intl.NumberFormat("he-IL", {
       style: "currency",
       currency,
-      maximumFractionDigits: 0,
+      // 7,200 ₪ but 123.45 ₪ and 12.50 ₪: cents only when there are some
+      trailingZeroDisplay: "stripIfInteger",
     });
     formatters.set(currency, formatter);
   }

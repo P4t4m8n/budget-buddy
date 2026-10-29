@@ -176,6 +176,64 @@ export async function removeCategoryRow(id: string) {
   await pool.query('delete from "Category" where id = $1', [id]);
 }
 
+export async function seedCategory(
+  userId: string,
+  name: string,
+  type: "INCOME" | "EXPENSE" = "EXPENSE",
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "Category" (id, "userId", name, type, color)
+     values ($1, $2, $3, $4::"TransactionType", '#f59e0b')`,
+    [id, userId, name, type],
+  );
+  return id;
+}
+
+export type SeededTransaction = {
+  description: string;
+  amount: number | string;
+  date: string;
+  type?: "INCOME" | "EXPENSE";
+};
+
+export async function seedTransaction(
+  userId: string,
+  categoryId: string,
+  { description, amount, date, type = "EXPENSE" }: SeededTransaction,
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "Transaction" (id, "userId", "categoryId", description, amount, type, date)
+     values ($1, $2, $3, $4, $5, $6::"TransactionType", $7)`,
+    [id, userId, categoryId, description, amount, type, date],
+  );
+  return id;
+}
+
+export async function transactionsOf(userId: string) {
+  const { rows } = await pool.query<{
+    id: string;
+    description: string;
+    amount: string;
+    type: string;
+    categoryId: string;
+    date: string;
+    note: string | null;
+    currency: string;
+  }>(
+    `select id, description, amount::text as amount, type, "categoryId",
+            to_char(date, 'YYYY-MM-DD') as date, note, currency
+     from "Transaction" where "userId" = $1 order by "createdAt"`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function removeTransactionRow(id: string) {
+  await pool.query('delete from "Transaction" where id = $1', [id]);
+}
+
 export async function insertTransaction(userId: string, categoryId: string, type = "EXPENSE") {
   await pool.query(
     `insert into "Transaction" (id, "userId", "categoryId", description, amount, type, date)

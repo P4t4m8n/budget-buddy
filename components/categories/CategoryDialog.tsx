@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useId, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useId, useState } from "react";
 import Dialog from "@mui/material/Dialog";
 import {
   createCategoryAction,
@@ -9,8 +8,11 @@ import {
   type CategoryFormState,
 } from "@/actions/categories";
 import Button from "@/components/ui/Button";
+import FieldError from "@/components/ui/FieldError";
+import FormAlert from "@/components/ui/FormAlert";
 import FormField, { inputClass } from "@/components/ui/FormField";
 import { CATEGORY_COLORS } from "@/lib/category-colors";
+import { useRefreshWhenStale } from "@/lib/hooks/use-refresh-when-stale";
 import { transactionTypeLabels } from "@/lib/labels";
 import type { Category, TransactionType } from "@/types/finance";
 
@@ -20,17 +22,12 @@ const initialState: CategoryFormState = { status: "idle" };
 // Add when no category is passed, edit otherwise
 export default function CategoryDialog({ category }: { category?: Category }) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
-  const listIsStale = useRef(false);
+  const { markStale, refreshIfStale } = useRefreshWhenStale();
   const titleId = useId();
 
   function close() {
     setOpen(false);
-    // The category turned out to be gone: show the list as it really is now
-    if (listIsStale.current) {
-      listIsStale.current = false;
-      router.refresh();
-    }
+    refreshIfStale();
   }
 
   return (
@@ -59,9 +56,7 @@ export default function CategoryDialog({ category }: { category?: Category }) {
           category={category}
           titleId={titleId}
           onClose={close}
-          onStale={() => {
-            listIsStale.current = true;
-          }}
+          onStale={markStale}
         />
       </Dialog>
     </>
@@ -105,11 +100,7 @@ function CategoryForm({
         {category ? "Edit category" : "Add category"}
       </h2>
 
-      {state.message && (
-        <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-          {state.message}
-        </p>
-      )}
+      {state.message && <FormAlert>{state.message}</FormAlert>}
 
       {category ? (
         // A category's type is fixed: its transactions must keep matching it
@@ -193,13 +184,5 @@ function CategoryForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-function FieldError({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <span id={id} className="text-xs text-red-400">
-      {children}
-    </span>
   );
 }
