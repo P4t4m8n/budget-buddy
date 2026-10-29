@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import UserMenu from "@/components/auth/UserMenu";
+import AuthGate from "@/components/auth/AuthGate";
 import NavLinks from "@/components/layout/NavLinks";
 
 export default function MainLayout({
@@ -27,7 +28,9 @@ export default function MainLayout({
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-x-hidden p-6 lg:p-8">
-        {children}
+        <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-white/5" />}>
+          <AuthGate>{children}</AuthGate>
+        </Suspense>
       </main>
     </div>
   );

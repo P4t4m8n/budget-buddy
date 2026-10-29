@@ -2,7 +2,11 @@ import "server-only";
 import { pkceChallenge, randomToken, safeEqual } from "./crypto";
 
 const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+// Overridable outside production only, so e2e tests can point the server-side
+// token exchange at a local fake Google
+const TOKEN_ENDPOINT =
+  (process.env.NODE_ENV !== "production" && process.env.GOOGLE_TOKEN_ENDPOINT) ||
+  "https://oauth2.googleapis.com/token";
 const ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 
 export class GoogleAuthError extends Error {}

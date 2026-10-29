@@ -1,11 +1,11 @@
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { getSession } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/dal";
 
 export default async function UserMenu() {
-  const session = await getSession();
+  const user = await getCurrentUser();
 
-  if (!session) {
+  if (!user) {
     return (
       <Link
         href="/login"
@@ -16,7 +16,6 @@ export default async function UserMenu() {
     );
   }
 
-  const { user } = session;
   const label = user.name ?? user.email;
 
   return (

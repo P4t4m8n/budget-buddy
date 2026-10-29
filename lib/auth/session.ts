@@ -2,8 +2,8 @@ import "server-only";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { hashToken, randomToken } from "./crypto";
+import { SESSION_COOKIE } from "./constants";
 
-export const SESSION_COOKIE = "session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const cookieOptions = {
