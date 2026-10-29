@@ -27,7 +27,7 @@ export default function RecentTransactions({
             }`}
           >
             {t.type === "income" ? "+" : "-"}
-            {formatCurrency(t.amount)}
+            {formatCurrency(t.amount, t.currency)}
           </span>
         </li>
       ))}

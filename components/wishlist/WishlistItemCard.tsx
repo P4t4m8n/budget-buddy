@@ -32,7 +32,9 @@ export default function WishlistItemCard({ item }: { item: WishlistItem }) {
           {item.priority}
         </span>
       </div>
-      <p className="mt-2 text-xl font-bold">{formatCurrency(item.price)}</p>
+      <p className="mt-2 text-xl font-bold">
+        {formatCurrency(item.price, item.currency)}
+      </p>
       <p className="mt-1 text-sm text-neutral-400">
         {statusLabels[item.status]}
       </p>

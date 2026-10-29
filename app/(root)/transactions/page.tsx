@@ -9,6 +9,7 @@ export default function TransactionsPage() {
     id: t.id,
     description: t.description,
     amount: t.amount,
+    currency: t.currency,
     type: t.type,
     categoryId: t.categoryId,
     categoryName:

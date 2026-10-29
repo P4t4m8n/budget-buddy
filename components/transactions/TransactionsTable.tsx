@@ -1,16 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import MenuItem from "@mui/material/MenuItem";
-import TextField from "@mui/material/TextField";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import FormField, { inputClass } from "@/components/ui/FormField";
+import SelectField from "@/components/ui/SelectField";
 import { formatCurrency } from "@/lib/format";
-import type { Category, TransactionType } from "@/types/finance";
+import type { Category, Currency, TransactionType } from "@/types/finance";
 
 export type TransactionRow = {
   id: string;
   description: string;
   amount: number;
+  currency: Currency;
   type: TransactionType;
   categoryId: string;
   categoryName: string;
@@ -38,7 +39,7 @@ const columns: GridColDef<TransactionRow>[] = [
     headerName: "Amount",
     type: "number",
     width: 130,
-    valueFormatter: (value: number) => formatCurrency(value),
+    valueFormatter: (value: number, row) => formatCurrency(value, row.currency),
   },
 ];
 
@@ -67,39 +68,41 @@ export default function TransactionsTable({
   return (
     <div>
       <div className="mb-4 flex flex-wrap gap-3">
-        <TextField
-          size="small"
-          label="Search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <TextField
-          select
-          size="small"
-          label="Type"
-          value={type}
-          onChange={(e) => setType(e.target.value as "all" | TransactionType)}
-          className="w-40"
-        >
-          <MenuItem value="all">All</MenuItem>
-          <MenuItem value="income">Income</MenuItem>
-          <MenuItem value="expense">Expense</MenuItem>
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Category"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="w-48"
-        >
-          <MenuItem value="all">All</MenuItem>
-          {categories.map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.name}
-            </MenuItem>
-          ))}
-        </TextField>
+        <div className="w-56">
+          <FormField label="Search">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Description"
+              className={inputClass}
+            />
+          </FormField>
+        </div>
+        <div className="w-40">
+          <FormField label="Type">
+            <SelectField
+              value={type}
+              onChange={(v) => setType(v as "all" | TransactionType)}
+              options={[
+                { value: "all", label: "All" },
+                { value: "income", label: "Income" },
+                { value: "expense", label: "Expense" },
+              ]}
+            />
+          </FormField>
+        </div>
+        <div className="w-48">
+          <FormField label="Category">
+            <SelectField
+              value={categoryId}
+              onChange={setCategoryId}
+              options={[
+                { value: "all", label: "All" },
+                ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
+          </FormField>
+        </div>
       </div>
 
       <DataGrid

@@ -18,5 +18,6 @@ export const budgets: Budget[] = ["2026-08", "2026-09", "2026-10"].flatMap(
       categoryId,
       month,
       limit,
+      currency: "ILS" as const,
     })),
 );

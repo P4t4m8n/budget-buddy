@@ -26,6 +26,7 @@ export default function BudgetPage() {
         name: category?.name ?? "Unknown",
         color: category?.color ?? "#737373",
         limit: b.limit,
+        currency: b.currency,
         spent,
       };
     });

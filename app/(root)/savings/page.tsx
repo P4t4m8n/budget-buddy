@@ -17,6 +17,7 @@ export default function SavingsPage() {
     ticker: i.ticker ?? "-",
     amountInvested: i.amountInvested,
     currentValue: i.currentValue,
+    currency: i.currency,
     gainPercent: ((i.currentValue - i.amountInvested) / i.amountInvested) * 100,
   }));
 

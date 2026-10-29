@@ -19,8 +19,8 @@ export default function SavingsGoalCard({ goal }: { goal: SavingsGoal }) {
         />
       </div>
       <p className="mt-3 text-sm text-neutral-400">
-        {formatCurrency(goal.currentAmount)} of{" "}
-        {formatCurrency(goal.targetAmount)}
+        {formatCurrency(goal.currentAmount, goal.currency)} of{" "}
+        {formatCurrency(goal.targetAmount, goal.currency)}
       </p>
       <p className="mt-1 text-xs text-neutral-500">
         {goal.targetDate ? `Target date: ${goal.targetDate}` : "No target date"}

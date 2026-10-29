@@ -1,11 +1,14 @@
 import { formatCurrency } from "@/lib/format";
 
+import type { Currency } from "@/types/finance";
+
 export type BudgetRow = {
   categoryId: string;
   name: string;
   color: string;
   limit: number;
   spent: number;
+  currency: Currency;
 };
 
 export default function BudgetProgressList({ rows }: { rows: BudgetRow[] }) {
@@ -31,7 +34,8 @@ export default function BudgetProgressList({ rows }: { rows: BudgetRow[] }) {
                 {row.name}
               </span>
               <span className="text-neutral-400">
-                {formatCurrency(row.spent)} / {formatCurrency(row.limit)}
+                {formatCurrency(row.spent, row.currency)} /{" "}
+                {formatCurrency(row.limit, row.currency)}
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-white/10">
@@ -42,7 +46,7 @@ export default function BudgetProgressList({ rows }: { rows: BudgetRow[] }) {
             </div>
             {ratio > 1 && (
               <p className="mt-1 text-xs text-red-400">
-                Over budget by {formatCurrency(row.spent - row.limit)}
+                Over budget by {formatCurrency(row.spent - row.limit, row.currency)}
               </p>
             )}
           </li>

@@ -1,5 +1,8 @@
 export type TransactionType = "income" | "expense";
 
+// ISO 4217 codes. Only ILS is used for now; EUR and USD arrive with the conversion API.
+export type Currency = "ILS" | "EUR" | "USD";
+
 export type Category = {
   id: string;
   name: string;
@@ -11,6 +14,7 @@ export type Transaction = {
   id: string;
   description: string;
   amount: number;
+  currency: Currency;
   type: TransactionType;
   categoryId: string;
   date: string; // ISO date, e.g. "2026-10-05"
@@ -22,6 +26,7 @@ export type Budget = {
   categoryId: string;
   month: string; // "YYYY-MM"
   limit: number;
+  currency: Currency;
 };
 
 export type SavingsGoal = {
@@ -29,6 +34,7 @@ export type SavingsGoal = {
   name: string;
   targetAmount: number;
   currentAmount: number;
+  currency: Currency;
   targetDate?: string;
 };
 
@@ -41,6 +47,7 @@ export type Investment = {
   ticker?: string;
   amountInvested: number;
   currentValue: number;
+  currency: Currency;
   purchaseDate: string;
 };
 
@@ -51,6 +58,7 @@ export type WishlistItem = {
   id: string;
   name: string;
   price: number;
+  currency: Currency;
   priority: WishlistPriority;
   status: WishlistStatus;
   url?: string;
