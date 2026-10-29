@@ -1,6 +1,6 @@
 import { test as base, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { Pool } from "pg";
+import { Pool, type QueryResultRow } from "pg";
 import { getTestDatabaseUrl } from "../setup/test-db";
 import { E2E_EMAIL_DOMAIN } from "./env";
 
@@ -26,10 +26,20 @@ export const test = base.extend({
   },
 });
 
-// Plain pg (not the app's Prisma client) so the tests check the database independently of the app
+// Plain pg (not the app's Prisma client) so the tests check the database independently of the app.
+// Created on first use and recreated after closeDatabase(): with one worker, every spec file
+// shares this module, and each file closes the pool when it finishes.
 const connection = new URL(getTestDatabaseUrl());
 connection.search = "";
-const pool = new Pool({ connectionString: connection.toString() });
+
+let activePool: Pool | undefined;
+
+const pool = {
+  query: <R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => {
+    activePool ??= new Pool({ connectionString: connection.toString() });
+    return activePool.query<R>(text, values);
+  },
+};
 
 export type UserRow = {
   id: string;
@@ -76,7 +86,9 @@ export async function deleteE2eUsers() {
 }
 
 export async function closeDatabase() {
-  await pool.end();
+  const closing = activePool;
+  activePool = undefined;
+  await closing?.end();
 }
 
 export type GoogleGrant = {
@@ -140,4 +152,34 @@ export async function mockGoogleConsent(page: Page, grant: GoogleGrant) {
 export async function signInWithGoogle(page: Page) {
   await page.goto("/login");
   await page.getByRole("link", { name: "Continue with Google" }).click();
+}
+
+// Signs a brand-new Google account in and returns it
+export async function signUp(page: Page, name = "Dana Levi") {
+  const account = newGoogleAccount(name);
+  await mockGoogleConsent(page, account);
+  await signInWithGoogle(page);
+  await page.waitForURL(/\/dashboard$/);
+  return account;
+}
+
+export async function categoriesOf(userId: string) {
+  const { rows } = await pool.query<{ id: string; name: string; type: string; color: string }>(
+    'select id, name, type, color from "Category" where "userId" = $1 order by name',
+    [userId],
+  );
+  return rows;
+}
+
+// Simulates another tab or device deleting the category
+export async function removeCategoryRow(id: string) {
+  await pool.query('delete from "Category" where id = $1', [id]);
+}
+
+export async function insertTransaction(userId: string, categoryId: string, type = "EXPENSE") {
+  await pool.query(
+    `insert into "Transaction" (id, "userId", "categoryId", description, amount, type, date)
+     values ($1, $2, $3, 'seeded', 10, $4::"TransactionType", '2026-10-01')`,
+    [randomUUID(), userId, categoryId, type],
+  );
 }

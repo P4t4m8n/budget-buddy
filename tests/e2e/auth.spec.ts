@@ -14,7 +14,15 @@ import {
 } from "./helpers";
 import { E2E_CLIENT_ID } from "./env";
 
-const PROTECTED_PAGES = ["/", "/dashboard", "/transactions", "/budget", "/savings", "/wishlist"];
+const PROTECTED_PAGES = [
+  "/",
+  "/dashboard",
+  "/transactions",
+  "/categories",
+  "/budget",
+  "/savings",
+  "/wishlist",
+];
 
 // Not getByRole("alert"): Next adds its own route announcer with that role to every page
 const loginError = (page: Page) => page.getByTestId("login-error");

@@ -13,6 +13,19 @@ export const investmentTypeLabels: Record<InvestmentType, string> = {
   OTHER: "Other",
 };
 
+const plural = (count: number, word: string) =>
+  `${count} ${word}${count === 1 ? "" : "s"}`;
+
+// "3 transactions and 1 budget"; empty when the category isn't used
+export function categoryUsageText(transactions: number, budgets: number) {
+  return [
+    transactions > 0 && plural(transactions, "transaction"),
+    budgets > 0 && plural(budgets, "budget"),
+  ]
+    .filter(Boolean)
+    .join(" and ");
+}
+
 export const transactionTypeLabels: Record<TransactionType, string> = {
   INCOME: "Income",
   EXPENSE: "Expense",
