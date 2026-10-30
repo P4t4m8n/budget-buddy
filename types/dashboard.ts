@@ -18,6 +18,7 @@ export type RecentTransaction = Transaction & { categoryName: string };
 export type Dashboard = {
   month: string; // the current month, "YYYY-MM"
   balance: number; // all income minus all expenses, ever
+  totalSaved: number; // what all savings goals hold
   income: number; // this month
   spending: number; // this month
   spendingByCategory: SpendingSlice[]; // this month, biggest first

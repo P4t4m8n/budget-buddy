@@ -68,6 +68,7 @@ describe("getDashboard", () => {
       balance: 0,
       income: 0,
       spending: 0,
+      totalSaved: 0,
       spendingByCategory: [],
       recent: [],
     });
@@ -327,6 +328,40 @@ describe("getDashboard", () => {
       const bobs = await getDashboard({ now: NOW });
       expect(bobs.balance).toBe(85000);
       expect(bobs.recent.map((t) => t.description)).toEqual(["bob's", "bob's pay"]);
+    });
+  });
+
+  describe("totalSaved", () => {
+    const goalWith = async (userId: string, ...amounts: (number | string)[]) => {
+      const goal = await prisma.savingsGoal.create({ data: { userId, name: "Goal", targetAmount: 1000 } });
+      for (const amount of amounts) {
+        await prisma.savingsDeposit.create({
+          data: { userId, goalId: goal.id, amount, date: new Date("2026-10-01T00:00:00Z") },
+        });
+      }
+      return goal.id;
+    };
+
+    it("adds up every goal's balance, withdrawals included, whatever the month", async () => {
+      await goalWith(alice.id, 1000, "250.50", -100);
+      await goalWith(alice.id, "0.10", "0.20");
+
+      expect((await getDashboard({ now: NOW })).totalSaved).toBe(1150.8);
+    });
+
+    it("doesn't count transactions", async () => {
+      await seed([{ category: aliceCategories.salary, type: "INCOME", amount: 5000, date: "2026-10-01" }]);
+
+      expect((await getDashboard({ now: NOW })).totalSaved).toBe(0);
+    });
+
+    it("only counts the signed-in user's savings", async () => {
+      await goalWith(alice.id, 100);
+      await goalWith(bob.id, 999);
+
+      expect((await getDashboard({ now: NOW })).totalSaved).toBe(100);
+      await signInAs(bob);
+      expect((await getDashboard({ now: NOW })).totalSaved).toBe(999);
     });
   });
 

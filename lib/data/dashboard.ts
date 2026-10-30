@@ -50,7 +50,7 @@ export const getDashboard = async (
   const thisMonth = monthBounds(month);
   const chartStart = monthBounds(months[0]).start;
 
-  const [balanceRows, monthlyRows, spendingRows, categories, recent] =
+  const [balanceRows, monthlyRows, spendingRows, categories, recent, saved] =
     await Promise.all([
       prisma.transaction.groupBy({
         by: ["type"],
@@ -83,6 +83,10 @@ export const getDashboard = async (
       }),
       getCategories(),
       getRecentTransactions(RECENT_COUNT),
+      prisma.savingsDeposit.aggregate({
+        where: { userId: user.id, goal: { currency: BASE_CURRENCY } },
+        _sum: { amount: true },
+      }),
     ]);
 
   const balance = zero();
@@ -122,6 +126,7 @@ export const getDashboard = async (
   return {
     month,
     balance: toNumber(balance.income.minus(balance.expense)),
+    totalSaved: toNumber(saved._sum.amount ?? new Prisma.Decimal(0)),
     income: current.income,
     spending: current.expenses,
     spendingByCategory,

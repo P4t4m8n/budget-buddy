@@ -338,6 +338,77 @@ export async function removeWishlistRow(id: string) {
   await pool.query('delete from "WishlistItem" where id = $1', [id]);
 }
 
+export async function seedGoal(
+  userId: string,
+  name: string,
+  targetAmount: number | string = 1000,
+  targetDate: string | null = null,
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "SavingsGoal" (id, "userId", name, "targetAmount", "targetDate")
+     values ($1, $2, $3, $4, $5::date)`,
+    [id, userId, name, targetAmount, targetDate],
+  );
+  return id;
+}
+
+export async function seedDeposit(
+  userId: string,
+  goalId: string,
+  amount: number | string,
+  date = "2026-10-01",
+  note: string | null = null,
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "SavingsDeposit" (id, "userId", "goalId", amount, date, note)
+     values ($1, $2, $3, $4, $5::date, $6)`,
+    [id, userId, goalId, amount, date, note],
+  );
+  return id;
+}
+
+export async function goalsOf(userId: string) {
+  const { rows } = await pool.query<{
+    id: string;
+    name: string;
+    targetAmount: string;
+    currency: string;
+    targetDate: string | null;
+  }>(
+    `select id, name, "targetAmount"::text as "targetAmount", currency,
+            to_char("targetDate", 'YYYY-MM-DD') as "targetDate"
+     from "SavingsGoal" where "userId" = $1 order by name`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function depositsOf(goalId: string) {
+  const { rows } = await pool.query<{
+    id: string;
+    amount: string;
+    date: string;
+    note: string | null;
+  }>(
+    `select id, amount::text as amount, to_char(date, 'YYYY-MM-DD') as date, note
+     from "SavingsDeposit" where "goalId" = $1 order by date, id`,
+    [goalId],
+  );
+  return rows;
+}
+
+// Simulates another tab or device deleting the goal (its deposits go with it)
+export async function removeGoalRow(id: string) {
+  await pool.query('delete from "SavingsGoal" where id = $1', [id]);
+}
+
+// Simulates another tab or device deleting the deposit
+export async function removeDepositRow(id: string) {
+  await pool.query('delete from "SavingsDeposit" where id = $1', [id]);
+}
+
 // Simulates another tab or device buying the item
 export async function markWishlistRowPurchased(id: string) {
   await pool.query(`update "WishlistItem" set status = 'PURCHASED' where id = $1`, [id]);

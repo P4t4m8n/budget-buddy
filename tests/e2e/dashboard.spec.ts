@@ -200,6 +200,6 @@ test("no longer shows the mock data", async ({ page }) => {
   await signUp(page);
   await page.goto("/dashboard");
 
-  await expect(page.getByText("Total saved")).toHaveCount(0);
+  await expectAmount(cardValue(page, "Total saved"), "0 ₪");
   await expect(page.getByText("19,500")).toHaveCount(0);
 });

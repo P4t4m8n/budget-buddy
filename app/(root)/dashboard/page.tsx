@@ -20,6 +20,7 @@ async function DashboardContent() {
   const {
     month,
     balance,
+    totalSaved,
     income,
     spending,
     spendingByCategory,
@@ -35,7 +36,7 @@ async function DashboardContent() {
         This month: {formatMonth(month)}
       </p>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="Balance"
           value={formatCurrency(balance)}
@@ -51,6 +52,7 @@ async function DashboardContent() {
           value={formatCurrency(spending)}
           tone="negative"
         />
+        <SummaryCard label="Total saved" value={formatCurrency(totalSaved)} />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
