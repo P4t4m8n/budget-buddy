@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 vi.mock("next/headers", async () => (await import("./cookie-jar")).nextHeadersMock);
 
 import { createCategory } from "@/lib/data/categories";
-import { CategoryMismatchError, NotFoundError } from "@/lib/data/errors";
+import { appError } from "../setup/app-error";
 import {
   createTransaction,
   deleteTransaction,
@@ -80,25 +80,26 @@ describe("createTransaction", () => {
     const bobFood = await createCategory({ name: "Groceries", type: "EXPENSE", color: "#f59e0b" });
     await signInAs(alice);
 
-    await expect(createTransaction(expense({ categoryId: bobFood.id }))).rejects.toBeInstanceOf(
-      CategoryMismatchError,
-    );
+    await expect(createTransaction(expense({ categoryId: bobFood.id }))).rejects.toMatchObject({
+      ...appError("INVALID_REFERENCE"),
+      field: "categoryId",
+    });
     expect(await prisma.transaction.count({ where: { userId: alice.id } })).toBe(0);
   });
 
   it("refuses a category that doesn't exist", async () => {
-    await expect(createTransaction(expense({ categoryId: "nope" }))).rejects.toBeInstanceOf(
-      CategoryMismatchError,
+    await expect(createTransaction(expense({ categoryId: "nope" }))).rejects.toMatchObject(
+      appError("INVALID_REFERENCE"),
     );
   });
 
   it("refuses a category of the other type", async () => {
     await expect(
       createTransaction(expense({ type: "EXPENSE", categoryId: aliceSalary.id })),
-    ).rejects.toBeInstanceOf(CategoryMismatchError);
+    ).rejects.toMatchObject(appError("INVALID_REFERENCE"));
     await expect(
       createTransaction(expense({ type: "INCOME", categoryId: aliceFood.id })),
-    ).rejects.toBeInstanceOf(CategoryMismatchError);
+    ).rejects.toMatchObject(appError("INVALID_REFERENCE"));
     expect(await prisma.transaction.count()).toBe(0);
   });
 
@@ -199,7 +200,7 @@ describe("updateTransaction", () => {
 
     await expect(
       updateTransaction(id, expense({ description: "Hacked", categoryId: bobFood.id })),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toMatchObject(appError("NOT_FOUND"));
 
     const row = await prisma.transaction.findUniqueOrThrow({ where: { id } });
     expect(row.description).toBe("Supermarket");
@@ -211,7 +212,7 @@ describe("updateTransaction", () => {
 
     await expect(
       updateTransaction(id, expense({ description: "Changed", type: "INCOME", categoryId: aliceFood.id })),
-    ).rejects.toBeInstanceOf(CategoryMismatchError);
+    ).rejects.toMatchObject(appError("INVALID_REFERENCE"));
 
     const row = await prisma.transaction.findUniqueOrThrow({ where: { id } });
     expect(row.description).toBe("Supermarket");
@@ -219,7 +220,7 @@ describe("updateTransaction", () => {
   });
 
   it("reports an unknown id", async () => {
-    await expect(updateTransaction("does-not-exist", expense())).rejects.toBeInstanceOf(NotFoundError);
+    await expect(updateTransaction("does-not-exist", expense())).rejects.toMatchObject(appError("NOT_FOUND"));
   });
 });
 
@@ -236,12 +237,12 @@ describe("deleteTransaction", () => {
     const { id } = await createTransaction(expense());
     await signInAs(bob);
 
-    await expect(deleteTransaction(id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteTransaction(id)).rejects.toMatchObject(appError("NOT_FOUND"));
     expect(await prisma.transaction.count({ where: { id } })).toBe(1);
   });
 
   it("reports an unknown id", async () => {
-    await expect(deleteTransaction("does-not-exist")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteTransaction("does-not-exist")).rejects.toMatchObject(appError("NOT_FOUND"));
   });
 });
 

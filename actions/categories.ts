@@ -6,11 +6,8 @@ import {
   deleteCategory,
   updateCategory,
 } from "@/lib/data/categories";
-import {
-  CategoryInUseError,
-  DuplicateCategoryError,
-  NotFoundError,
-} from "@/lib/data/errors";
+import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   categoryInputSchema,
   categoryUpdateSchema,
@@ -26,39 +23,15 @@ type Field = (typeof FIELDS)[number];
 
 export type CategoryFormState = FormState<Field>;
 
-export type DeleteCategoryResult =
-  | { ok: true }
-  | { ok: false; reason: "in_use"; transactions: number; budgets: number }
-  | { ok: false; reason: "not_found" };
-
 // A category shows up on the transactions page too (names, filter, form)
 const refreshCategoryPages = () => {
   revalidatePath("/categories");
   revalidatePath("/transactions");
 };
 
-// Expected failures become messages for the form; anything else (including the
-// redirect to /login for signed-out users) is rethrown on purpose
-const failure = (
-  error: unknown,
-  values: Record<Field, string>,
-): CategoryFormState => {
-  if (error instanceof DuplicateCategoryError) {
-    return { status: "error", fieldErrors: { name: error.message }, values };
-  }
-  if (error instanceof NotFoundError) {
-    // No revalidatePath here: the refresh would remove this category's row, and the
-    // open dialog with it, before the user could read the message. The dialog
-    // refreshes the list when it is closed instead.
-    return {
-      status: "error",
-      message:
-        "This category no longer exists. It may have been deleted in another tab.",
-      values,
-    };
-  }
-  throw error;
-};
+// No revalidatePath when an action fails with NOT_FOUND: the refresh would remove the
+// category's row, and the open dialog with it, before the user could read the message.
+// The dialog refreshes the list when it is closed instead.
 
 export const createCategoryAction = async (
   _previous: CategoryFormState,
@@ -71,7 +44,7 @@ export const createCategoryAction = async (
   try {
     await createCategory(parsed.data);
   } catch (error) {
-    return failure(error, values);
+    return formFailure(error, values);
   }
 
   refreshCategoryPages();
@@ -91,7 +64,7 @@ export const updateCategoryAction = async (
   try {
     await updateCategory(id, parsed.data);
   } catch (error) {
-    return failure(error, values);
+    return formFailure(error, values);
   }
 
   refreshCategoryPages();
@@ -100,27 +73,16 @@ export const updateCategoryAction = async (
 
 export const deleteCategoryAction = async (
   id: string,
-): Promise<DeleteCategoryResult> => {
-  // never trust the argument's type
-  if (typeof id !== "string" || id === "")
-    return { ok: false, reason: "not_found" };
+): Promise<ActionResult> => {
+  // Server Actions are public endpoints: never trust the argument's type
+  if (typeof id !== "string" || id === "") {
+    return actionFailure(AppError.notFound("category"));
+  }
 
   try {
     await deleteCategory(id);
   } catch (error) {
-    if (error instanceof CategoryInUseError) {
-      return {
-        ok: false,
-        reason: "in_use",
-        transactions: error.transactions,
-        budgets: error.budgets,
-      };
-    }
-    if (error instanceof NotFoundError) {
-      // The dialog refreshes the list when it closes, after showing the message
-      return { ok: false, reason: "not_found" };
-    }
-    throw error;
+    return actionFailure(error);
   }
 
   refreshCategoryPages();

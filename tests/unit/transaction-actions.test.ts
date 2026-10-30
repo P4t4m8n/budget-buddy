@@ -13,12 +13,19 @@ import {
   deleteTransactionAction,
   updateTransactionAction,
 } from "@/actions/transactions";
-import { CategoryMismatchError, NotFoundError } from "@/lib/data/errors";
+import { AppError } from "@/lib/errors/app-error";
+import { redirectError } from "../setup/redirect-error";
 import {
   createTransaction,
   deleteTransaction,
   updateTransaction,
 } from "@/lib/data/transactions";
+
+const invalidCategory = () =>
+  AppError.invalidReference(
+    "Choose one of your categories that matches the transaction type",
+    "categoryId",
+  );
 
 const form = (fields: Record<string, string>) => {
   const formData = new FormData();
@@ -103,26 +110,38 @@ describe("createTransactionAction", () => {
   });
 
   it("explains a category that doesn't fit, on the category field", async () => {
-    vi.mocked(createTransaction).mockRejectedValue(new CategoryMismatchError());
+    vi.mocked(createTransaction).mockRejectedValue(invalidCategory());
 
     const result = await createTransactionAction(idle, form(valid));
 
     expect(result).toEqual({
       status: "error",
+      errorCode: "INVALID_REFERENCE",
       fieldErrors: { categoryId: "Choose one of your categories that matches the transaction type" },
       values: valid,
     });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("rethrows anything unexpected, such as the redirect for signed-out users", async () => {
-    const redirect = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/login" });
+  it("lets the redirect for signed-out users through, without logging it as an error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const redirect = redirectError();
     vi.mocked(createTransaction).mockRejectedValue(redirect);
 
     await expect(createTransactionAction(idle, form(valid))).rejects.toBe(redirect);
 
-    vi.mocked(createTransaction).mockRejectedValue(new Error("connection lost"));
-    await expect(createTransactionAction(idle, form(valid))).rejects.toThrow("connection lost");
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("logs anything unexpected once and rethrows it", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failure = new Error("connection lost");
+    vi.mocked(createTransaction).mockRejectedValue(failure);
+
+    await expect(createTransactionAction(idle, form(valid))).rejects.toBe(failure);
+
+    expect(consoleError).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalledWith("Unexpected error", failure);
   });
 });
 
@@ -143,7 +162,7 @@ describe("updateTransactionAction", () => {
   });
 
   it("explains a category that doesn't fit", async () => {
-    vi.mocked(updateTransaction).mockRejectedValue(new CategoryMismatchError());
+    vi.mocked(updateTransaction).mockRejectedValue(invalidCategory());
 
     const result = await updateTransactionAction("tx-1", idle, form(valid));
 
@@ -151,11 +170,12 @@ describe("updateTransactionAction", () => {
   });
 
   it("explains a transaction that vanished, leaving the refresh to the dialog", async () => {
-    vi.mocked(updateTransaction).mockRejectedValue(new NotFoundError("Transaction"));
+    vi.mocked(updateTransaction).mockRejectedValue(AppError.notFound("transaction"));
 
     const result = await updateTransactionAction("gone", idle, form(valid));
 
     expect(result.status).toBe("error");
+    expect(result.errorCode).toBe("NOT_FOUND");
     expect(result.message).toContain("no longer exists");
     // Refreshing now would remove the row and the open dialog before the message is read
     expect(revalidatePath).not.toHaveBeenCalled();
@@ -176,14 +196,20 @@ describe("deleteTransactionAction", () => {
   });
 
   it("reports a transaction that no longer exists", async () => {
-    vi.mocked(deleteTransaction).mockRejectedValue(new NotFoundError("Transaction"));
+    vi.mocked(deleteTransaction).mockRejectedValue(AppError.notFound("transaction"));
 
-    expect(await deleteTransactionAction("gone")).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteTransactionAction("gone")).toEqual({
+      ok: false,
+      error: { code: "NOT_FOUND", message: expect.stringContaining("transaction no longer exists") },
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it.each([undefined, null, 42, {}, ""])("rejects the id %j without touching the database", async (id) => {
-    expect(await deleteTransactionAction(id as never)).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteTransactionAction(id as never)).toMatchObject({
+      ok: false,
+      error: { code: "NOT_FOUND" },
+    });
     expect(deleteTransaction).not.toHaveBeenCalled();
   });
 

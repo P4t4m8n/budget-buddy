@@ -15,6 +15,11 @@ import { createUser, deleteTestUsers, signInAs, signOut } from "./support";
 
 const idle = { status: "idle" } as const;
 
+const notFound = {
+  ok: false,
+  error: { code: "NOT_FOUND", message: expect.stringContaining("no longer exists") },
+};
+
 const form = (fields: Record<string, string>) => {
   const formData = new FormData();
   for (const [key, value] of Object.entries(fields)) formData.set(key, value);
@@ -169,12 +174,12 @@ describe("transaction Server Actions against the database", () => {
     const [{ id }] = await rowsOf(alice.id);
     await signInAs(bob);
 
-    expect(await deleteTransactionAction(id)).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteTransactionAction(id)).toEqual(notFound);
     expect(await rowsOf(alice.id)).toHaveLength(1);
   });
 
   it("reports a transaction that is already gone", async () => {
-    expect(await deleteTransactionAction("does-not-exist")).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteTransactionAction("does-not-exist")).toEqual(notFound);
   });
 
   it("sends signed-out callers to /login instead of returning data", async () => {

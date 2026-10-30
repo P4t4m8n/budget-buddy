@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  GoogleAuthError,
   getGoogleProfile,
   googleRedirectUri,
   isValidState,
@@ -8,6 +7,8 @@ import {
 import { takeOAuthCookies } from "@/lib/auth/oauth-cookies";
 import { createSession } from "@/lib/auth/session";
 import { upsertGoogleUser } from "@/lib/auth/user";
+import { isAppError } from "@/lib/errors/app-error";
+import { logUnexpected } from "@/lib/errors/handle";
 
 export async function GET(request: NextRequest) {
   const { origin, searchParams } = request.nextUrl;
@@ -40,8 +41,10 @@ export async function GET(request: NextRequest) {
     const user = await upsertGoogleUser(profile);
     await createSession(user.id);
   } catch (error) {
-    if (error instanceof GoogleAuthError) return fail("google_failed");
-    console.error("Google sign-in failed", error);
+    if (isAppError(error) && error.code === "AUTH_FAILED") {
+      return fail("google_failed");
+    }
+    logUnexpected(error);
     return fail("server_error");
   }
 

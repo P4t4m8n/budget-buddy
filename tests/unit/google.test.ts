@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pkceChallenge } from "@/lib/auth/crypto";
 import {
-  GoogleAuthError,
   createAuthorizationRequest,
   getGoogleProfile,
   googleRedirectUri,
   isValidState,
 } from "@/lib/auth/google";
+import { AppError } from "@/lib/errors/app-error";
+import { appError } from "../setup/app-error";
 
 const REDIRECT_URI = "http://localhost:3000/api/auth/callback/google";
 const NONCE = "expected-nonce";
@@ -149,8 +150,8 @@ describe("getGoogleProfile", () => {
     mockTokenResponse({ id_token: idToken(overrides) });
 
     const error = await exchange().catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(GoogleAuthError);
-    expect((error as Error).message).toBe(message);
+    expect(error).toBeInstanceOf(AppError);
+    expect(error).toMatchObject({ ...appError("AUTH_FAILED"), message });
   });
 
   it("rejects when Google refuses the code", async () => {
@@ -167,7 +168,7 @@ describe("getGoogleProfile", () => {
     "rejects a malformed id_token (%s)",
     async (malformed) => {
       mockTokenResponse({ id_token: malformed });
-      await expect(exchange()).rejects.toBeInstanceOf(GoogleAuthError);
+      await expect(exchange()).rejects.toMatchObject(appError("AUTH_FAILED"));
     },
   );
 });

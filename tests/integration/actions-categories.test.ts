@@ -92,7 +92,10 @@ describe("category Server Actions against the database", () => {
     const { id } = await prisma.category.findFirstOrThrow({ where: { userId: alice.id } });
     await signInAs(bob);
 
-    expect(await deleteCategoryAction(id)).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteCategoryAction(id)).toEqual({
+      ok: false,
+      error: { code: "NOT_FOUND", message: expect.stringContaining("no longer exists") },
+    });
     expect(await prisma.category.count({ where: { id } })).toBe(1);
   });
 
@@ -120,9 +123,11 @@ describe("category Server Actions against the database", () => {
 
     expect(await deleteCategoryAction(id)).toEqual({
       ok: false,
-      reason: "in_use",
-      transactions: 2,
-      budgets: 0,
+      error: {
+        code: "IN_USE",
+        message: expect.any(String),
+        details: { transactions: 2, budgets: 0 },
+      },
     });
     expect(await prisma.category.count({ where: { id } })).toBe(1);
   });

@@ -1,10 +1,13 @@
 import { z } from "zod";
+import type { AppErrorCode } from "@/lib/errors/app-error";
 
 // Result of a form Server Action, as read by useActionState
 export type FormState<Field extends string> = {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: Partial<Record<Field, string>>;
+  // Set when the error came from an AppError, so the form can react to what kind it was
+  errorCode?: AppErrorCode;
   // Sent back so the form can refill itself: React clears uncontrolled fields after an action
   values?: Record<Field, string>;
 };

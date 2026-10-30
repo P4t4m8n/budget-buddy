@@ -1,10 +1,10 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
+import { AppError } from "@/lib/errors/app-error";
 import { prisma } from "@/lib/prisma";
 import type { TransactionInput } from "@/lib/validation/transaction";
 import type { Transaction, TransactionType } from "@/types/finance";
-import { CategoryMismatchError, NotFoundError } from "./errors";
 import { fromDateString, toDateString, toNumber } from "./serialize";
 
 const select = {
@@ -46,7 +46,12 @@ async function assertOwnCategoryOfType(
     where: { id: categoryId, userId },
     select: { type: true },
   });
-  if (!category || category.type !== type) throw new CategoryMismatchError();
+  if (!category || category.type !== type) {
+    throw AppError.invalidReference(
+      "Choose one of your categories that matches the transaction type",
+      "categoryId",
+    );
+  }
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
@@ -84,7 +89,7 @@ export async function updateTransaction(
     where: { id, userId: user.id },
     data: toData(input),
   });
-  if (count === 0) throw new NotFoundError("Transaction");
+  if (count === 0) throw AppError.notFound("transaction");
 
   const row = await prisma.transaction.findFirstOrThrow({
     where: { id, userId: user.id },
@@ -99,5 +104,5 @@ export async function deleteTransaction(id: string): Promise<void> {
   const { count } = await prisma.transaction.deleteMany({
     where: { id, userId: user.id },
   });
-  if (count === 0) throw new NotFoundError("Transaction");
+  if (count === 0) throw AppError.notFound("transaction");
 }

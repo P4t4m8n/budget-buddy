@@ -34,18 +34,18 @@ export default function DeleteCategoryButton({
 
       if (result.ok) {
         close();
-      } else if (result.reason === "in_use") {
-        const usage = categoryUsageText(result.transactions, result.budgets);
+      } else if (result.error.code === "IN_USE") {
+        const { transactions = 0, budgets = 0 } = result.error.details ?? {};
+        const usage = categoryUsageText(transactions, budgets);
         setError(
           usage
             ? `“${category.name}” is still used by ${usage}. Move or delete them first.`
             : `“${category.name}” is still in use. Move or delete what uses it first.`,
         );
       } else {
-        markStale();
-        setError(
-          "This category no longer exists. It may have been deleted in another tab.",
-        );
+        // The list is out of date: refresh it once the message has been read
+        if (result.error.code === "NOT_FOUND") markStale();
+        setError(result.error.message);
       }
     });
   };

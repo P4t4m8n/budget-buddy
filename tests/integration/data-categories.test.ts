@@ -8,11 +8,7 @@ import {
   getCategories,
   updateCategory,
 } from "@/lib/data/categories";
-import {
-  CategoryInUseError,
-  DuplicateCategoryError,
-  NotFoundError,
-} from "@/lib/data/errors";
+import { appError } from "../setup/app-error";
 import { prisma } from "@/lib/prisma";
 import { createUser, deleteTestUsers, signInAs, signOut } from "./support";
 
@@ -81,7 +77,10 @@ describe("createCategory", () => {
   it("rejects a duplicate name and type", async () => {
     await createCategory(food);
 
-    await expect(createCategory({ ...food, color: "#000000" })).rejects.toBeInstanceOf(DuplicateCategoryError);
+    await expect(createCategory({ ...food, color: "#000000" })).rejects.toMatchObject({
+      ...appError("DUPLICATE"),
+      field: "name",
+    });
   });
 
   it("allows the same name with another type", async () => {
@@ -127,8 +126,8 @@ describe("updateCategory", () => {
     await createCategory({ name: "Rent", type: "EXPENSE", color: "#6366f1" });
     const { id } = await createCategory(food);
 
-    await expect(updateCategory(id, { name: "Rent", color: "#000000" })).rejects.toBeInstanceOf(
-      DuplicateCategoryError,
+    await expect(updateCategory(id, { name: "Rent", color: "#000000" })).rejects.toMatchObject(
+      appError("DUPLICATE"),
     );
   });
 
@@ -136,15 +135,15 @@ describe("updateCategory", () => {
     const { id } = await createCategory(food);
     await signInAs(bob);
 
-    await expect(updateCategory(id, { name: "Hacked", color: "#000000" })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(updateCategory(id, { name: "Hacked", color: "#000000" })).rejects.toMatchObject(appError("NOT_FOUND"));
 
     const row = await prisma.category.findUniqueOrThrow({ where: { id } });
     expect(row.name).toBe("Groceries");
   });
 
   it("reports an unknown id", async () => {
-    await expect(updateCategory("does-not-exist", { name: "X", color: "#000000" })).rejects.toBeInstanceOf(
-      NotFoundError,
+    await expect(updateCategory("does-not-exist", { name: "X", color: "#000000" })).rejects.toMatchObject(
+      appError("NOT_FOUND"),
     );
   });
 });
@@ -173,8 +172,7 @@ describe("deleteCategory", () => {
 
     const error = await deleteCategory(id).catch((e: unknown) => e);
 
-    expect(error).toBeInstanceOf(CategoryInUseError);
-    expect(error).toMatchObject({ transactions: 1, budgets: 0 });
+    expect(error).toMatchObject({ ...appError("IN_USE"), details: { transactions: 1, budgets: 0 } });
     expect(await prisma.category.count({ where: { id } })).toBe(1);
   });
 
@@ -186,19 +184,18 @@ describe("deleteCategory", () => {
 
     const error = await deleteCategory(id).catch((e: unknown) => e);
 
-    expect(error).toBeInstanceOf(CategoryInUseError);
-    expect(error).toMatchObject({ transactions: 0, budgets: 1 });
+    expect(error).toMatchObject({ ...appError("IN_USE"), details: { transactions: 0, budgets: 1 } });
   });
 
   it("can't delete another user's category", async () => {
     const { id } = await createCategory(food);
     await signInAs(bob);
 
-    await expect(deleteCategory(id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteCategory(id)).rejects.toMatchObject(appError("NOT_FOUND"));
     expect(await prisma.category.count({ where: { id } })).toBe(1);
   });
 
   it("reports an unknown id", async () => {
-    await expect(deleteCategory("does-not-exist")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteCategory("does-not-exist")).rejects.toMatchObject(appError("NOT_FOUND"));
   });
 });

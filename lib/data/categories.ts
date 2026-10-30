@@ -2,12 +2,9 @@ import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
+import { AppError } from "@/lib/errors/app-error";
 import { prisma } from "@/lib/prisma";
-import {
-  CategoryInUseError,
-  DuplicateCategoryError,
-  NotFoundError,
-} from "./errors";
+import { toAppError } from "./prisma-errors";
 
 import type { CategoryInput, CategoryUpdate } from "@/lib/validation/category";
 import type { Category } from "@/types/finance";
@@ -19,8 +16,14 @@ const select = {
   color: true,
 } satisfies Prisma.CategorySelect;
 
-const hasPrismaCode = (error: unknown, code: string) =>
-  error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+const duplicateCategory = () =>
+  AppError.duplicate("You already have a category with this name and type", "name");
+
+const categoryInUse = (transactions: number, budgets: number) =>
+  AppError.inUse("This category is still used by transactions or budgets", {
+    transactions,
+    budgets,
+  });
 
 // Every function resolves the signed-in user itself and scopes all queries to them.
 // Input is expected to be validated already (lib/validation).
@@ -46,8 +49,7 @@ export const createCategory = async (
       select,
     });
   } catch (error) {
-    if (hasPrismaCode(error, "P2002")) throw new DuplicateCategoryError();
-    throw error;
+    throw toAppError(error, { P2002: duplicateCategory });
   }
 };
 
@@ -63,10 +65,9 @@ export const updateCategory = async (
       // Only these two, even if the caller passes more: the type must never change
       data: { name: input.name, color: input.color },
     });
-    if (count === 0) throw new NotFoundError("Category");
+    if (count === 0) throw AppError.notFound("category");
   } catch (error) {
-    if (hasPrismaCode(error, "P2002")) throw new DuplicateCategoryError();
-    throw error;
+    throw toAppError(error, { P2002: duplicateCategory });
   }
 
   return prisma.category.findFirstOrThrow({
@@ -82,18 +83,17 @@ export const deleteCategory = async (id: string): Promise<void> => {
     where: { id, userId: user.id },
     select: { _count: { select: { transactions: true, budgets: true } } },
   });
-  if (!category) throw new NotFoundError("Category");
+  if (!category) throw AppError.notFound("category");
 
   const { transactions, budgets } = category._count;
   if (transactions > 0 || budgets > 0) {
-    throw new CategoryInUseError(transactions, budgets);
+    throw categoryInUse(transactions, budgets);
   }
 
   try {
     await prisma.category.deleteMany({ where: { id, userId: user.id } });
   } catch (error) {
     // Something started using it between the check and the delete
-    if (hasPrismaCode(error, "P2003")) throw new CategoryInUseError(0, 0);
-    throw error;
+    throw toAppError(error, { P2003: () => categoryInUse(0, 0) });
   }
 };

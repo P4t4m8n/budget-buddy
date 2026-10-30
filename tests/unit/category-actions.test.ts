@@ -18,11 +18,11 @@ import {
   deleteCategory,
   updateCategory,
 } from "@/lib/data/categories";
-import {
-  CategoryInUseError,
-  DuplicateCategoryError,
-  NotFoundError,
-} from "@/lib/data/errors";
+import { AppError } from "@/lib/errors/app-error";
+import { redirectError } from "../setup/redirect-error";
+
+const duplicate = () =>
+  AppError.duplicate("You already have a category with this name and type", "name");
 
 const form = (fields: Record<string, string>) => {
   const formData = new FormData();
@@ -91,26 +91,38 @@ describe("createCategoryAction", () => {
   });
 
   it("shows a duplicate on the name field and keeps the input", async () => {
-    vi.mocked(createCategory).mockRejectedValue(new DuplicateCategoryError());
+    vi.mocked(createCategory).mockRejectedValue(duplicate());
 
     const result = await createCategoryAction(idle, form(valid));
 
     expect(result).toEqual({
       status: "error",
+      errorCode: "DUPLICATE",
       fieldErrors: { name: "You already have a category with this name and type" },
       values: valid,
     });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("rethrows anything unexpected, such as the redirect for signed-out users", async () => {
-    const redirect = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/login" });
+  it("lets the redirect for signed-out users through, without logging it as an error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const redirect = redirectError();
     vi.mocked(createCategory).mockRejectedValue(redirect);
 
     await expect(createCategoryAction(idle, form(valid))).rejects.toBe(redirect);
 
-    vi.mocked(createCategory).mockRejectedValue(new Error("connection lost"));
-    await expect(createCategoryAction(idle, form(valid))).rejects.toThrow("connection lost");
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("logs anything unexpected once and rethrows it", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failure = new Error("connection lost");
+    vi.mocked(createCategory).mockRejectedValue(failure);
+
+    await expect(createCategoryAction(idle, form(valid))).rejects.toBe(failure);
+
+    expect(consoleError).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalledWith("Unexpected error", failure);
   });
 
   it("ignores values that aren't text", async () => {
@@ -148,7 +160,7 @@ describe("updateCategoryAction", () => {
   });
 
   it("shows a duplicate on the name field", async () => {
-    vi.mocked(updateCategory).mockRejectedValue(new DuplicateCategoryError());
+    vi.mocked(updateCategory).mockRejectedValue(duplicate());
 
     const result = await updateCategoryAction("cat-1", idle, form({ name: "Rent", color: "#10b981" }));
 
@@ -156,11 +168,12 @@ describe("updateCategoryAction", () => {
   });
 
   it("explains a category that vanished, leaving the refresh to the dialog", async () => {
-    vi.mocked(updateCategory).mockRejectedValue(new NotFoundError("Category"));
+    vi.mocked(updateCategory).mockRejectedValue(AppError.notFound("category"));
 
     const result = await updateCategoryAction("gone", idle, form({ name: "Rent", color: "#10b981" }));
 
     expect(result.status).toBe("error");
+    expect(result.errorCode).toBe("NOT_FOUND");
     expect(result.message).toContain("no longer exists");
     // Refreshing now would remove the row and the open dialog before the message is read
     expect(revalidatePath).not.toHaveBeenCalled();
@@ -182,26 +195,36 @@ describe("deleteCategoryAction", () => {
   });
 
   it("reports what still uses the category", async () => {
-    vi.mocked(deleteCategory).mockRejectedValue(new CategoryInUseError(12, 3));
+    vi.mocked(deleteCategory).mockRejectedValue(
+      AppError.inUse("still used", { transactions: 12, budgets: 3 }),
+    );
 
     expect(await deleteCategoryAction("cat-1")).toEqual({
       ok: false,
-      reason: "in_use",
-      transactions: 12,
-      budgets: 3,
+      error: {
+        code: "IN_USE",
+        message: "still used",
+        details: { transactions: 12, budgets: 3 },
+      },
     });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("reports a category that no longer exists", async () => {
-    vi.mocked(deleteCategory).mockRejectedValue(new NotFoundError("Category"));
+    vi.mocked(deleteCategory).mockRejectedValue(AppError.notFound("category"));
 
-    expect(await deleteCategoryAction("gone")).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteCategoryAction("gone")).toEqual({
+      ok: false,
+      error: { code: "NOT_FOUND", message: expect.stringContaining("category no longer exists") },
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it.each([undefined, null, 42, {}, ""])("rejects the id %j without touching the database", async (id) => {
-    expect(await deleteCategoryAction(id as never)).toEqual({ ok: false, reason: "not_found" });
+    expect(await deleteCategoryAction(id as never)).toMatchObject({
+      ok: false,
+      error: { code: "NOT_FOUND" },
+    });
     expect(deleteCategory).not.toHaveBeenCalled();
   });
 

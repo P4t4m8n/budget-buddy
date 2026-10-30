@@ -1,4 +1,5 @@
 import "server-only";
+import { AppError } from "@/lib/errors/app-error";
 import { pkceChallenge, randomToken, safeEqual } from "./crypto";
 
 const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -8,9 +9,6 @@ const TOKEN_ENDPOINT =
   (process.env.NODE_ENV !== "production" && process.env.GOOGLE_TOKEN_ENDPOINT) ||
   "https://oauth2.googleapis.com/token";
 const ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
-
-export class GoogleAuthError extends Error {}
-
 // Must match the redirect URI registered in Google Cloud exactly
 export function googleRedirectUri(origin: string) {
   return `${origin}/api/auth/callback/google`;
@@ -90,12 +88,12 @@ export const getGoogleProfile = async ({
     cache: "no-store",
   });
 
-  if (!response.ok) throw new GoogleAuthError("Google token exchange failed");
+  if (!response.ok) throw AppError.authFailed("Google token exchange failed");
 
   const { id_token: idToken } = (await response.json()) as {
     id_token?: string;
   };
-  if (!idToken) throw new GoogleAuthError("Google returned no id_token");
+  if (!idToken) throw AppError.authFailed("Google returned no id_token");
 
   // The token came straight from Google's token endpoint over TLS, so its
   // signature doesn't need verifying; the claims below still do.
@@ -103,20 +101,20 @@ export const getGoogleProfile = async ({
   const now = Math.floor(Date.now() / 1000);
 
   if (typeof claims.iss !== "string" || !ISSUERS.includes(claims.iss)) {
-    throw new GoogleAuthError("Invalid issuer");
+    throw AppError.authFailed("Invalid issuer");
   }
-  if (claims.aud !== clientId) throw new GoogleAuthError("Invalid audience");
+  if (claims.aud !== clientId) throw AppError.authFailed("Invalid audience");
   if (typeof claims.exp !== "number" || claims.exp <= now) {
-    throw new GoogleAuthError("Token expired");
+    throw AppError.authFailed("Token expired");
   }
   if (typeof claims.nonce !== "string" || !safeEqual(claims.nonce, nonce)) {
-    throw new GoogleAuthError("Invalid nonce");
+    throw AppError.authFailed("Invalid nonce");
   }
   if (typeof claims.sub !== "string" || typeof claims.email !== "string") {
-    throw new GoogleAuthError("Missing claims");
+    throw AppError.authFailed("Missing claims");
   }
   if (claims.email_verified !== true) {
-    throw new GoogleAuthError("Email is not verified");
+    throw AppError.authFailed("Email is not verified");
   }
 
   return {
@@ -129,10 +127,10 @@ export const getGoogleProfile = async ({
 
 const decodeJwtPayload = (jwt: string): Record<string, unknown> => {
   const payload = jwt.split(".")[1];
-  if (!payload) throw new GoogleAuthError("Malformed id_token");
+  if (!payload) throw AppError.authFailed("Malformed id_token");
   try {
     return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
   } catch {
-    throw new GoogleAuthError("Malformed id_token");
+    throw AppError.authFailed("Malformed id_token");
   }
 };

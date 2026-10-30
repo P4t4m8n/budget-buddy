@@ -53,7 +53,7 @@ export default function CategoryDialogForm({
   >(async (previous, formData) => {
     const result = await action(previous, formData);
     if (result.status === "success") onClose();
-    else if (result.message) onStale();
+    else if (result.errorCode === "NOT_FOUND") onStale();
     return result;
   }, initialState);
 

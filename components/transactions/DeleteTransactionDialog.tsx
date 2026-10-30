@@ -39,8 +39,9 @@ export default function DeleteTransactionDialog({
       if (result.ok) {
         close();
       } else {
-        markStale();
-        setError("This transaction no longer exists. It may have been deleted in another tab.");
+        // The list is out of date: refresh it once the message has been read
+        if (result.error.code === "NOT_FOUND") markStale();
+        setError(result.error.message);
       }
     });
   }

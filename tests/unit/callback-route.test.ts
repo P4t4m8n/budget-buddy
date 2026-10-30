@@ -10,10 +10,11 @@ vi.mock("@/lib/auth/session", () => ({ createSession: vi.fn() }));
 vi.mock("@/lib/auth/user", () => ({ upsertGoogleUser: vi.fn() }));
 
 import { GET } from "@/app/api/auth/callback/google/route";
-import { GoogleAuthError, getGoogleProfile } from "@/lib/auth/google";
+import { getGoogleProfile } from "@/lib/auth/google";
 import { takeOAuthCookies } from "@/lib/auth/oauth-cookies";
 import { createSession } from "@/lib/auth/session";
 import { upsertGoogleUser } from "@/lib/auth/user";
+import { AppError } from "@/lib/errors/app-error";
 
 const PROFILE = { sub: "123", email: "dana@example.com", name: "Dana", picture: null };
 
@@ -82,7 +83,7 @@ describe("GET /api/auth/callback/google", () => {
   });
 
   it("reports a rejected Google token without creating a session", async () => {
-    vi.mocked(getGoogleProfile).mockRejectedValue(new GoogleAuthError("Invalid nonce"));
+    vi.mocked(getGoogleProfile).mockRejectedValue(AppError.authFailed("Invalid nonce"));
 
     const response = await callback("code=abc&state=saved-state");
 
@@ -101,5 +102,15 @@ describe("GET /api/auth/callback/google", () => {
     expect(response.headers.get("location")).not.toContain("database");
     expect(createSession).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalled();
+  });
+
+  it("treats an AppError that isn't a sign-in rejection as unexpected here", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(upsertGoogleUser).mockRejectedValue(AppError.notFound("user"));
+
+    const response = await callback("code=abc&state=saved-state");
+
+    expect(redirectedTo(response).searchParams.get("error")).toBe("server_error");
+    expect(consoleError).toHaveBeenCalledOnce();
   });
 });
