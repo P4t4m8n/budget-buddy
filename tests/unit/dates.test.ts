@@ -3,8 +3,36 @@ import {
   addMonths,
   currentMonth,
   monthBounds,
+  parseMonth,
   recentMonths,
 } from "@/lib/dates";
+
+describe("parseMonth", () => {
+  it.each(["2026-10", "2026-01", "2026-12", "2000-01", "2099-12"])("accepts %s", (month) => {
+    expect(parseMonth(month)).toBe(month);
+  });
+
+  it.each([
+    "",
+    "2026-13",
+    "2026-00",
+    "2026-1",
+    "26-10",
+    "1999-12",
+    "2100-01",
+    "2026-10-01",
+    " 2026-10",
+    "2026/10",
+    "october",
+    "2026-10\n",
+  ])("rejects %j", (value) => {
+    expect(parseMonth(value)).toBeUndefined();
+  });
+
+  it.each([undefined, null, 202610, ["2026-10"], {}])("rejects the non-string %j", (value) => {
+    expect(parseMonth(value)).toBeUndefined();
+  });
+});
 
 describe("currentMonth", () => {
   it("uses the month in the given timezone, not the server's", () => {

@@ -15,6 +15,12 @@ export const currentMonth = (now: Date, timeZone: string) => {
   return `${part("year")}-${part("month")}`;
 };
 
+// A month taken from user input such as ?month=2026-10; undefined when it isn't one
+export const parseMonth = (value: unknown) =>
+  typeof value === "string" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(value)
+    ? value
+    : undefined;
+
 export const addMonths = (month: string, count: number) => {
   const [year, monthNumber] = month.split("-").map(Number);
   const index = year * 12 + (monthNumber - 1) + count;

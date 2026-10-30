@@ -1,8 +1,31 @@
-import { test as base, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test as base, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { Pool, type QueryResultRow } from "pg";
+import { APP_TIME_ZONE } from "../../lib/constants";
+import { currentMonth } from "../../lib/dates";
 import { getTestDatabaseUrl } from "../setup/test-db";
 import { E2E_EMAIL_DOMAIN } from "./env";
+
+// The pages work out "this month" themselves; the tests ask the same helper, so they agree
+export const thisMonth = () => currentMonth(new Date(), APP_TIME_ZONE);
+
+export const day = (month: string, dayOfMonth: number) =>
+  `${month}-${String(dayOfMonth).padStart(2, "0")}`;
+
+// The Hebrew currency format wraps amounts in invisible direction marks and uses no-break
+// spaces; compare what the user reads
+export const readable = (text: string | null) =>
+  (text ?? "").replace(/[\u200e\u200f]/g, "").replace(/\u00a0/g, " ");
+
+export const expectReadable = (locator: Locator, expected: string) =>
+  expect.poll(async () => readable(await locator.textContent())).toContain(expected);
+
+export const expectAmount = (locator: Locator, expected: string) =>
+  expect.poll(async () => readable(await locator.textContent())).toBe(expected);
+
+// The big number of a summary card, found by its label
+export const cardValue = (page: Page, label: string) =>
+  page.getByText(label, { exact: true }).locator("xpath=following-sibling::p[1]");
 
 // In dev, Next's round "N" indicator floats over the bottom-left of the sidebar, right on top
 // of the Sign out button, and swallows clicks. It doesn't exist in production builds.
@@ -233,6 +256,41 @@ export async function transactionsOf(userId: string) {
 
 export async function removeTransactionRow(id: string) {
   await pool.query('delete from "Transaction" where id = $1', [id]);
+}
+
+export async function seedBudget(
+  userId: string,
+  categoryId: string,
+  month: string,
+  limit: number | string,
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "Budget" (id, "userId", "categoryId", month, "limit")
+     values ($1, $2, $3, $4::date, $5)`,
+    [id, userId, categoryId, `${month}-01`, limit],
+  );
+  return id;
+}
+
+export async function budgetsOf(userId: string) {
+  const { rows } = await pool.query<{
+    id: string;
+    categoryId: string;
+    month: string;
+    limit: string;
+    currency: string;
+  }>(
+    `select id, "categoryId", to_char(month, 'YYYY-MM') as month, "limit"::text as "limit", currency
+     from "Budget" where "userId" = $1 order by month, "categoryId"`,
+    [userId],
+  );
+  return rows;
+}
+
+// Simulates another tab or device removing the budget
+export async function removeBudgetRow(id: string) {
+  await pool.query('delete from "Budget" where id = $1', [id]);
 }
 
 export async function insertTransaction(userId: string, categoryId: string, type = "EXPENSE") {

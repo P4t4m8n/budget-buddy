@@ -1,15 +1,19 @@
-import { expect, type Locator, type Page } from "@playwright/test";
-import { APP_TIME_ZONE } from "../../lib/constants";
-import { addMonths, currentMonth } from "../../lib/dates";
+import { expect, type Page } from "@playwright/test";
+import { addMonths } from "../../lib/dates";
 import {
+  cardValue,
   closeDatabase,
+  day,
   deleteE2eUsers,
+  expectAmount,
+  expectReadable,
   findUser,
   hideNextDevIndicator,
   seedCategory,
   seedTransaction,
   signUp,
   test,
+  thisMonth,
   type GoogleGrant,
 } from "./helpers";
 
@@ -18,29 +22,8 @@ test.afterAll(closeDatabase);
 
 const userIdOf = async (account: GoogleGrant) => (await findUser(account.email))!.id;
 
-// The page works out "this month" itself; the tests ask the same helper, so they agree
-const thisMonth = () => currentMonth(new Date(), APP_TIME_ZONE);
-const day = (month: string, dayOfMonth: number) =>
-  `${month}-${String(dayOfMonth).padStart(2, "0")}`;
-
-const cardValue = (page: Page, label: string) =>
-  page
-    .getByText(label, { exact: true })
-    .locator("xpath=following-sibling::p[1]");
-
 const recentList = (page: Page) =>
   page.getByRole("heading", { name: "Recent transactions" }).locator("xpath=following-sibling::ul/li");
-
-// The Hebrew currency format wraps amounts in invisible direction marks and uses no-break
-// spaces; compare what the user reads
-const readable = (text: string | null) =>
-  (text ?? "").replace(/[\u200e\u200f]/g, "").replace(/\u00a0/g, " ");
-
-const expectReadable = (locator: Locator, expected: string) =>
-  expect.poll(async () => readable(await locator.textContent())).toContain(expected);
-
-const expectAmount = (locator: Locator, expected: string) =>
-  expect.poll(async () => readable(await locator.textContent())).toBe(expected);
 
 // A signed-in user with an expense category and an income category
 async function setUp(page: Page) {
