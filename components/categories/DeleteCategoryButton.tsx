@@ -7,22 +7,28 @@ import Button from "@/components/ui/Button";
 import FormAlert from "@/components/ui/FormAlert";
 import { useRefreshWhenStale } from "@/lib/hooks/use-refresh-when-stale";
 import { categoryUsageText } from "@/lib/labels";
+
 import type { Category } from "@/types/finance";
 
-export default function DeleteCategoryButton({ category }: { category: Category }) {
+export default function DeleteCategoryButton({
+  category,
+}: {
+  category: Category;
+}) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { markStale, refreshIfStale } = useRefreshWhenStale();
+
   const titleId = useId();
 
-  function close() {
+  const close = () => {
     setOpen(false);
     setError(null);
     refreshIfStale();
-  }
+  };
 
-  function confirmDelete() {
+  const confirmDelete = () => {
     startTransition(async () => {
       const result = await deleteCategoryAction(category.id);
 
@@ -37,10 +43,12 @@ export default function DeleteCategoryButton({ category }: { category: Category 
         );
       } else {
         markStale();
-        setError("This category no longer exists. It may have been deleted in another tab.");
+        setError(
+          "This category no longer exists. It may have been deleted in another tab.",
+        );
       }
     });
-  }
+  };
 
   return (
     <>

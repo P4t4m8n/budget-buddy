@@ -15,19 +15,25 @@ const cookieOptions = {
   maxAge: MAX_AGE_SECONDS,
 } as const;
 
-export async function setOAuthCookies(values: {
+export const setOAuthCookies = async (values: {
   state: string;
   nonce: string;
   codeVerifier: string;
-}) {
-  const cookieStore = await cookies();
-  cookieStore.set(STATE_COOKIE, values.state, cookieOptions);
-  cookieStore.set(NONCE_COOKIE, values.nonce, cookieOptions);
-  cookieStore.set(VERIFIER_COOKIE, values.codeVerifier, cookieOptions);
-}
+}): Promise<void> => {
+  return (async () => {
+    const cookieStore = await cookies();
+    cookieStore.set(STATE_COOKIE, values.state, cookieOptions);
+    cookieStore.set(NONCE_COOKIE, values.nonce, cookieOptions);
+    cookieStore.set(VERIFIER_COOKIE, values.codeVerifier, cookieOptions);
+  })();
+};
 
 // Reads and clears the cookies: each login attempt can only be used once
-export async function takeOAuthCookies() {
+export const takeOAuthCookies = async (): Promise<{
+  state?: string;
+  nonce?: string;
+  codeVerifier?: string;
+}> => {
   const cookieStore = await cookies();
   const values = {
     state: cookieStore.get(STATE_COOKIE)?.value,
@@ -39,4 +45,4 @@ export async function takeOAuthCookies() {
     cookieStore.set(name, "", { ...cookieOptions, maxAge: 0 });
   }
   return values;
-}
+};

@@ -1,15 +1,16 @@
 const messages: Record<string, string> = {
   access_denied: "Sign-in was cancelled. Try again whenever you're ready.",
-  invalid_request: "The sign-in request was invalid or expired. Please try again.",
+  invalid_request:
+    "The sign-in request was invalid or expired. Please try again.",
   google_failed: "Google sign-in failed. Please try again.",
   server_error: "Something went wrong on our side. Please try again.",
 };
 
-export default async function LoginError({
-  searchParams,
-}: {
+interface LoginErrorProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default async function LoginError({ searchParams }: LoginErrorProps) {
   const { error } = await searchParams;
   if (typeof error !== "string") return null;
 

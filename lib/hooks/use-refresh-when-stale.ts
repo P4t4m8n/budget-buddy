@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 // tab). Refreshing right away would remove the item, and the open dialog with it, before the
 // user could read the message. So: markStale() when the message is shown, and
 // refreshIfStale() when the dialog closes.
-export function useRefreshWhenStale() {
+export const useRefreshWhenStale = () => {
   const router = useRouter();
   const stale = useRef(false);
 
@@ -21,4 +21,4 @@ export function useRefreshWhenStale() {
       router.refresh();
     },
   };
-}
+};

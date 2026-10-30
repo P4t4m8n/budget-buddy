@@ -1,14 +1,16 @@
 import "server-only";
+
 import { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
-import type { CategoryInput, CategoryUpdate } from "@/lib/validation/category";
-import type { Category } from "@/types/finance";
 import {
   CategoryInUseError,
   DuplicateCategoryError,
   NotFoundError,
 } from "./errors";
+
+import type { CategoryInput, CategoryUpdate } from "@/lib/validation/category";
+import type { Category } from "@/types/finance";
 
 const select = {
   id: true,
@@ -23,7 +25,7 @@ const hasPrismaCode = (error: unknown, code: string) =>
 // Every function resolves the signed-in user itself and scopes all queries to them.
 // Input is expected to be validated already (lib/validation).
 
-export async function getCategories(): Promise<Category[]> {
+export const getCategories = async (): Promise<Category[]> => {
   const user = await requireUser();
 
   return prisma.category.findMany({
@@ -31,9 +33,11 @@ export async function getCategories(): Promise<Category[]> {
     select,
     orderBy: [{ type: "asc" }, { name: "asc" }],
   });
-}
+};
 
-export async function createCategory(input: CategoryInput): Promise<Category> {
+export const createCategory = async (
+  input: CategoryInput,
+): Promise<Category> => {
   const user = await requireUser();
 
   try {
@@ -45,12 +49,12 @@ export async function createCategory(input: CategoryInput): Promise<Category> {
     if (hasPrismaCode(error, "P2002")) throw new DuplicateCategoryError();
     throw error;
   }
-}
+};
 
-export async function updateCategory(
+export const updateCategory = async (
   id: string,
   input: CategoryUpdate,
-): Promise<Category> {
+): Promise<Category> => {
   const user = await requireUser();
 
   try {
@@ -69,9 +73,9 @@ export async function updateCategory(
     where: { id, userId: user.id },
     select,
   });
-}
+};
 
-export async function deleteCategory(id: string): Promise<void> {
+export const deleteCategory = async (id: string): Promise<void> => {
   const user = await requireUser();
 
   const category = await prisma.category.findFirst({
@@ -92,4 +96,4 @@ export async function deleteCategory(id: string): Promise<void> {
     if (hasPrismaCode(error, "P2003")) throw new CategoryInUseError(0, 0);
     throw error;
   }
-}
+};
