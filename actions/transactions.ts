@@ -23,16 +23,16 @@ export type DeleteTransactionResult =
   | { ok: true }
   | { ok: false; reason: "not_found" };
 
-function refreshTransactionPages() {
+const refreshTransactionPages = () => {
   revalidatePath("/transactions");
 }
 
 // Expected failures become messages for the form; anything else (including the
 // redirect to /login for signed-out users) is rethrown on purpose
-function failure(
+const failure = (
   error: unknown,
   values: Record<Field, string>,
-): TransactionFormState {
+): TransactionFormState => {
   if (error instanceof CategoryMismatchError) {
     return { status: "error", fieldErrors: { categoryId: error.message }, values };
   }
@@ -47,12 +47,12 @@ function failure(
     };
   }
   throw error;
-}
+};
 
-export async function createTransactionAction(
+export const createTransactionAction = async (
   _previous: TransactionFormState,
   formData: FormData,
-): Promise<TransactionFormState> {
+): Promise<TransactionFormState> => {
   const values = readFormValues(formData, FIELDS);
   const parsed = transactionInputSchema.safeParse(values);
   if (!parsed.success) return validationFailure(parsed.error, values);
@@ -65,14 +65,14 @@ export async function createTransactionAction(
 
   refreshTransactionPages();
   return { status: "success" };
-}
+};
 
 // Bind the id: updateTransactionAction.bind(null, transaction.id)
-export async function updateTransactionAction(
+export const updateTransactionAction = async (
   id: string,
   _previous: TransactionFormState,
   formData: FormData,
-): Promise<TransactionFormState> {
+): Promise<TransactionFormState> => {
   const values = readFormValues(formData, FIELDS);
   const parsed = transactionInputSchema.safeParse(values);
   if (!parsed.success) return validationFailure(parsed.error, values);
@@ -85,11 +85,11 @@ export async function updateTransactionAction(
 
   refreshTransactionPages();
   return { status: "success" };
-}
+};
 
-export async function deleteTransactionAction(
+export const deleteTransactionAction = async (
   id: string,
-): Promise<DeleteTransactionResult> {
+): Promise<DeleteTransactionResult> => {
   // Server Actions are public endpoints: never trust the argument's type
   if (typeof id !== "string" || id === "") return { ok: false, reason: "not_found" };
 
@@ -105,4 +105,4 @@ export async function deleteTransactionAction(
 
   refreshTransactionPages();
   return { ok: true };
-}
+};

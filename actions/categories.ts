@@ -32,17 +32,17 @@ export type DeleteCategoryResult =
   | { ok: false; reason: "not_found" };
 
 // A category shows up on the transactions page too (names, filter, form)
-function refreshCategoryPages() {
+const refreshCategoryPages = () => {
   revalidatePath("/categories");
   revalidatePath("/transactions");
-}
+};
 
 // Expected failures become messages for the form; anything else (including the
 // redirect to /login for signed-out users) is rethrown on purpose
-function failure(
+const failure = (
   error: unknown,
   values: Record<Field, string>,
-): CategoryFormState {
+): CategoryFormState => {
   if (error instanceof DuplicateCategoryError) {
     return { status: "error", fieldErrors: { name: error.message }, values };
   }
@@ -52,17 +52,18 @@ function failure(
     // refreshes the list when it is closed instead.
     return {
       status: "error",
-      message: "This category no longer exists. It may have been deleted in another tab.",
+      message:
+        "This category no longer exists. It may have been deleted in another tab.",
       values,
     };
   }
   throw error;
-}
+};
 
-export async function createCategoryAction(
+export const createCategoryAction = async (
   _previous: CategoryFormState,
   formData: FormData,
-): Promise<CategoryFormState> {
+): Promise<CategoryFormState> => {
   const values = readFormValues(formData, FIELDS);
   const parsed = categoryInputSchema.safeParse(values);
   if (!parsed.success) return validationFailure(parsed.error, values);
@@ -75,14 +76,14 @@ export async function createCategoryAction(
 
   refreshCategoryPages();
   return { status: "success" };
-}
+};
 
 // Bind the id: updateCategoryAction.bind(null, category.id)
-export async function updateCategoryAction(
+export const updateCategoryAction = async (
   id: string,
   _previous: CategoryFormState,
   formData: FormData,
-): Promise<CategoryFormState> {
+): Promise<CategoryFormState> => {
   const values = readFormValues(formData, FIELDS);
   const parsed = categoryUpdateSchema.safeParse(values);
   if (!parsed.success) return validationFailure(parsed.error, values);
@@ -95,13 +96,14 @@ export async function updateCategoryAction(
 
   refreshCategoryPages();
   return { status: "success" };
-}
+};
 
-export async function deleteCategoryAction(
+export const deleteCategoryAction = async (
   id: string,
-): Promise<DeleteCategoryResult> {
-  // Server Actions are public endpoints: never trust the argument's type
-  if (typeof id !== "string" || id === "") return { ok: false, reason: "not_found" };
+): Promise<DeleteCategoryResult> => {
+  // never trust the argument's type
+  if (typeof id !== "string" || id === "")
+    return { ok: false, reason: "not_found" };
 
   try {
     await deleteCategory(id);
@@ -123,4 +125,4 @@ export async function deleteCategoryAction(
 
   refreshCategoryPages();
   return { ok: true };
-}
+};
