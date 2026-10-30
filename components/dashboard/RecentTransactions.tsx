@@ -1,15 +1,22 @@
-import type { Category, Transaction } from "@/types/finance";
+import Link from "next/link";
 import { formatCurrency } from "@/lib/format";
+import type { RecentTransaction } from "@/types/dashboard";
 
 export default function RecentTransactions({
   transactions,
-  categories,
 }: {
-  transactions: Transaction[];
-  categories: Category[];
+  transactions: RecentTransaction[];
 }) {
-  const categoryName = (id: string) =>
-    categories.find((c) => c.id === id)?.name ?? "Unknown";
+  if (transactions.length === 0) {
+    return (
+      <p className="py-3 text-sm text-neutral-400">
+        No transactions yet.{" "}
+        <Link href="/transactions" className="text-emerald-400 hover:underline">
+          Add your first one on the Transactions page.
+        </Link>
+      </p>
+    );
+  }
 
   return (
     <ul className="divide-y divide-white/10">
@@ -18,7 +25,7 @@ export default function RecentTransactions({
           <div>
             <p className="text-sm font-medium">{t.description}</p>
             <p className="text-xs text-neutral-400">
-              {categoryName(t.categoryId)} · {t.date}
+              {t.categoryName} · {t.date}
             </p>
           </div>
           <span

@@ -1,13 +1,8 @@
 "use client";
 
 import { PieChart } from "@mui/x-charts/PieChart";
-
-export type SpendingSlice = {
-  id: string;
-  label: string;
-  value: number;
-  color: string;
-};
+import { formatCurrency } from "@/lib/format";
+import type { SpendingSlice } from "@/types/dashboard";
 
 export default function SpendingByCategoryChart({
   data,
@@ -17,7 +12,14 @@ export default function SpendingByCategoryChart({
   return (
     <PieChart
       height={280}
-      series={[{ data, innerRadius: 60, paddingAngle: 2 }]}
+      series={[
+        {
+          data,
+          innerRadius: 60,
+          paddingAngle: 2,
+          valueFormatter: ({ value }) => formatCurrency(value),
+        },
+      ]}
     />
   );
 }

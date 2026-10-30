@@ -159,7 +159,7 @@ test.describe("signing in", () => {
     await page.reload();
     await expect(page.locator("aside").getByText("Dana Levi")).toBeVisible();
 
-    await page.getByRole("link", { name: "Transactions" }).click();
+    await page.locator("aside").getByRole("link", { name: "Transactions" }).click();
     await expect(page).toHaveURL(/\/transactions$/);
     await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible();
 

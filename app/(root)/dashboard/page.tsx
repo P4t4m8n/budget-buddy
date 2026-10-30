@@ -1,70 +1,46 @@
+import { Suspense } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/layout/PageHeader";
 import MonthlyOverviewChart from "@/components/dashboard/MonthlyOverviewChart";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import SpendingByCategoryChart from "@/components/dashboard/SpendingByCategoryChart";
 import SummaryCard from "@/components/dashboard/SummaryCard";
-import { CURRENT_MONTH } from "@/lib/constants";
-import { formatCurrency } from "@/lib/format";
-import {
-  categories,
-  savingsDeposits,
-  transactions,
-} from "@/lib/mock-data";
+import { getDashboard } from "@/lib/data/dashboard";
+import { formatCurrency, formatMonth } from "@/lib/format";
 
-const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
+const panel = "rounded-xl border border-white/10 bg-neutral-900 p-5";
 
-export default function DashboardPage() {
-  const monthTransactions = transactions.filter((t) =>
-    t.date.startsWith(CURRENT_MONTH),
-  );
-  const income = sum(
-    monthTransactions.filter((t) => t.type === "INCOME").map((t) => t.amount),
-  );
-  const spending = sum(
-    monthTransactions.filter((t) => t.type === "EXPENSE").map((t) => t.amount),
-  );
-  const totalSaved = sum(savingsDeposits.map((d) => d.amount));
-  const balance =
-    sum(transactions.filter((t) => t.type === "INCOME").map((t) => t.amount)) -
-    sum(transactions.filter((t) => t.type === "EXPENSE").map((t) => t.amount));
+const EmptyChart = ({ children }: { children: React.ReactNode }) => (
+  <p className="flex h-70 items-center justify-center text-center text-sm text-neutral-400">
+    {children}
+  </p>
+);
 
-  const spendingByCategory = categories
-    .filter((c) => c.type === "EXPENSE")
-    .map((c) => ({
-      id: c.id,
-      label: c.name,
-      color: c.color,
-      value: sum(
-        monthTransactions
-          .filter((t) => t.categoryId === c.id)
-          .map((t) => t.amount),
-      ),
-    }))
-    .filter((slice) => slice.value > 0);
+async function DashboardContent() {
+  const {
+    month,
+    balance,
+    income,
+    spending,
+    spendingByCategory,
+    monthlyTotals,
+    recent,
+  } = await getDashboard();
 
-  const months = [...new Set(transactions.map((t) => t.date.slice(0, 7)))].sort();
-  const monthlyTotals = months.map((month) => {
-    const inMonth = transactions.filter((t) => t.date.startsWith(month));
-    return {
-      month,
-      income: sum(inMonth.filter((t) => t.type === "INCOME").map((t) => t.amount)),
-      expenses: sum(inMonth.filter((t) => t.type === "EXPENSE").map((t) => t.amount)),
-    };
-  });
-
-  const recent = [...transactions]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 6);
+  const hasActivity = monthlyTotals.some((m) => m.income > 0 || m.expenses > 0);
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description="Overview of your balance, income and spending"
-      />
+      <p className="mb-4 text-sm text-neutral-400">
+        This month: {formatMonth(month)}
+      </p>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Balance" value={formatCurrency(balance)} />
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <SummaryCard
+          label="Balance"
+          value={formatCurrency(balance)}
+          tone={balance < 0 ? "negative" : "neutral"}
+        />
         <SummaryCard
           label="Income this month"
           value={formatCurrency(income)}
@@ -75,24 +51,58 @@ export default function DashboardPage() {
           value={formatCurrency(spending)}
           tone="negative"
         />
-        <SummaryCard label="Total saved" value={formatCurrency(totalSaved)} />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-neutral-900 p-5">
+        <div className={panel}>
           <h2 className="mb-2 font-semibold">Spending by category</h2>
-          <SpendingByCategoryChart data={spendingByCategory} />
+          {spendingByCategory.length > 0 ? (
+            <SpendingByCategoryChart data={spendingByCategory} />
+          ) : (
+            <EmptyChart>No spending recorded this month.</EmptyChart>
+          )}
         </div>
-        <div className="rounded-xl border border-white/10 bg-neutral-900 p-5">
+        <div className={panel}>
           <h2 className="mb-2 font-semibold">Income vs. expenses</h2>
-          <MonthlyOverviewChart data={monthlyTotals} />
+          {hasActivity ? (
+            <MonthlyOverviewChart data={monthlyTotals} />
+          ) : (
+            <EmptyChart>
+              <span>
+                Nothing in the last {monthlyTotals.length} months yet.{" "}
+                <Link
+                  href="/transactions"
+                  className="text-emerald-400 hover:underline"
+                >
+                  Add a transaction
+                </Link>{" "}
+                to see it here.
+              </span>
+            </EmptyChart>
+          )}
         </div>
       </section>
 
-      <section className="mt-6 rounded-xl border border-white/10 bg-neutral-900 p-5">
+      <section className={`mt-6 ${panel}`}>
         <h2 className="mb-2 font-semibold">Recent transactions</h2>
-        <RecentTransactions transactions={recent} categories={categories} />
+        <RecentTransactions transactions={recent} />
       </section>
+    </>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <>
+      <PageHeader
+        title="Dashboard"
+        description="Overview of your balance, income and spending"
+      />
+      <Suspense
+        fallback={<div className="h-96 animate-pulse rounded-xl bg-neutral-900" />}
+      >
+        <DashboardContent />
+      </Suspense>
     </>
   );
 }

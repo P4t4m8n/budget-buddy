@@ -23,10 +23,12 @@ type Field = (typeof FIELDS)[number];
 
 export type CategoryFormState = FormState<Field>;
 
-// A category shows up on the transactions page too (names, filter, form)
+// A category shows up on the transactions page (names, filter, form) and on the dashboard
+// (the spending chart and the recent list)
 const refreshCategoryPages = () => {
   revalidatePath("/categories");
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
 };
 
 // No revalidatePath when an action fails with NOT_FOUND: the refresh would remove the

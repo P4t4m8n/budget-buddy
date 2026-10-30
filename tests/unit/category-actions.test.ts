@@ -46,8 +46,9 @@ describe("createCategoryAction", () => {
       color: "#f59e0b",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/categories");
-    // Categories appear on the transactions page too: names, filter and form
+    // Categories appear on the transactions page too (names, filter and form), and on the dashboard
     expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("never lets the client choose the owner", async () => {
@@ -142,8 +143,9 @@ describe("updateCategoryAction", () => {
     expect(result).toEqual({ status: "success" });
     expect(updateCategory).toHaveBeenCalledWith("cat-1", { name: "Food", color: "#10b981" });
     expect(revalidatePath).toHaveBeenCalledWith("/categories");
-    // A rename changes the category names shown on the transactions page
+    // A rename changes the category names shown on the transactions page and the dashboard
     expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("ignores an attempt to change the type", async () => {
@@ -192,6 +194,7 @@ describe("deleteCategoryAction", () => {
     expect(deleteCategory).toHaveBeenCalledWith("cat-1");
     expect(revalidatePath).toHaveBeenCalledWith("/categories");
     expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("reports what still uses the category", async () => {

@@ -19,3 +19,13 @@ export const formatCurrency = (
   }
   return formatter.format(amount);
 };
+
+const monthFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+// "2026-10" -> "October 2026"
+export const formatMonth = (month: string): string =>
+  monthFormatter.format(new Date(`${month}-01T00:00:00Z`));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMonth } from "@/lib/format";
 
 // Intl puts a no-break space before the symbol and wraps it in invisible direction marks
 const plain = (text: string) =>
@@ -29,5 +29,16 @@ describe("formatCurrency", () => {
   it("formats other currencies with their own symbol", () => {
     expect(plain(formatCurrency(10, "USD"))).toContain("$");
     expect(plain(formatCurrency(10, "EUR"))).toContain("€");
+  });
+});
+
+describe("formatMonth", () => {
+  it.each([
+    ["2026-10", "October 2026"],
+    ["2026-01", "January 2026"],
+    ["2026-12", "December 2026"],
+    ["2024-02", "February 2024"],
+  ])("formats %s as %s", (month, expected) => {
+    expect(formatMonth(month)).toBe(expected);
   });
 });

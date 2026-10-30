@@ -180,12 +180,13 @@ export async function seedCategory(
   userId: string,
   name: string,
   type: "INCOME" | "EXPENSE" = "EXPENSE",
+  color = "#f59e0b",
 ) {
   const id = randomUUID();
   await pool.query(
     `insert into "Category" (id, "userId", name, type, color)
-     values ($1, $2, $3, $4::"TransactionType", '#f59e0b')`,
-    [id, userId, name, type],
+     values ($1, $2, $3, $4::"TransactionType", $5)`,
+    [id, userId, name, type, color],
   );
   return id;
 }

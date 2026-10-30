@@ -63,6 +63,8 @@ describe("createTransactionAction", () => {
       note: "weekly shop",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+    // The dashboard's totals, charts and recent list change with every transaction
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("stores a blank note as null", async () => {
@@ -152,6 +154,7 @@ describe("updateTransactionAction", () => {
     expect(result).toEqual({ status: "success" });
     expect(updateTransaction).toHaveBeenCalledWith("tx-1", expect.objectContaining({ amount: 123.45 }));
     expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("validates before touching the database", async () => {
@@ -193,6 +196,7 @@ describe("deleteTransactionAction", () => {
     expect(await deleteTransactionAction("tx-1")).toEqual({ ok: true });
     expect(deleteTransaction).toHaveBeenCalledWith("tx-1");
     expect(revalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("reports a transaction that no longer exists", async () => {

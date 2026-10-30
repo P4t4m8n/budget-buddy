@@ -65,6 +65,21 @@ export async function getTransactions(): Promise<Transaction[]> {
   return rows.map(toTransaction);
 }
 
+// The newest transactions, in the same order as the full list
+export async function getRecentTransactions(
+  limit: number,
+): Promise<Transaction[]> {
+  const user = await requireUser();
+
+  const rows = await prisma.transaction.findMany({
+    where: { userId: user.id },
+    select,
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    take: limit,
+  });
+  return rows.map(toTransaction);
+}
+
 export async function createTransaction(
   input: TransactionInput,
 ): Promise<Transaction> {

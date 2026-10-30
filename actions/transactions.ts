@@ -20,8 +20,10 @@ type Field = (typeof FIELDS)[number];
 
 export type TransactionFormState = FormState<Field>;
 
+// The dashboard shows totals, charts and the newest transactions, so it changes too
 const refreshTransactionPages = () => {
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
 }
 
 // No revalidatePath when an action fails with NOT_FOUND: the refresh would remove the
