@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 
 // The error Next throws for redirect("/login"): what signed-out users trigger inside a data call
-export const redirectError = () => {
+export const redirectError = (): unknown => {
   try {
-    redirect("/login");
+    return redirect("/login");
   } catch (error) {
     return error;
   }
-  throw new Error("redirect() did not throw");
 };
