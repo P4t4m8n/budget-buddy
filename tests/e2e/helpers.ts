@@ -293,6 +293,56 @@ export async function removeBudgetRow(id: string) {
   await pool.query('delete from "Budget" where id = $1', [id]);
 }
 
+export type SeededWishlistItem = {
+  name: string;
+  price?: number | string;
+  priority?: "LOW" | "MEDIUM" | "HIGH";
+  status?: "WANTED" | "SAVING" | "PURCHASED";
+  url?: string | null;
+  notes?: string | null;
+};
+
+export async function seedWishlistItem(
+  userId: string,
+  { name, price = 100, priority = "MEDIUM", status = "WANTED", url = null, notes = null }: SeededWishlistItem,
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "WishlistItem" (id, "userId", name, price, priority, status, url, notes)
+     values ($1, $2, $3, $4, $5::"WishlistPriority", $6::"WishlistStatus", $7, $8)`,
+    [id, userId, name, price, priority, status, url, notes],
+  );
+  return id;
+}
+
+export async function wishlistOf(userId: string) {
+  const { rows } = await pool.query<{
+    id: string;
+    name: string;
+    price: string;
+    currency: string;
+    priority: string;
+    status: string;
+    url: string | null;
+    notes: string | null;
+  }>(
+    `select id, name, price::text as price, currency, priority, status, url, notes
+     from "WishlistItem" where "userId" = $1 order by name`,
+    [userId],
+  );
+  return rows;
+}
+
+// Simulates another tab or device deleting the item
+export async function removeWishlistRow(id: string) {
+  await pool.query('delete from "WishlistItem" where id = $1', [id]);
+}
+
+// Simulates another tab or device buying the item
+export async function markWishlistRowPurchased(id: string) {
+  await pool.query(`update "WishlistItem" set status = 'PURCHASED' where id = $1`, [id]);
+}
+
 export async function insertTransaction(userId: string, categoryId: string, type = "EXPENSE") {
   await pool.query(
     `insert into "Transaction" (id, "userId", "categoryId", description, amount, type, date)
