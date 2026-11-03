@@ -28,10 +28,16 @@ export type SkippedRow = {
   reason: string;
 };
 
-// What the user decided for a row: the category to file it under, or to leave it out
+// Where a suggested category came from
+export type SuggestionSource = "import" | "history";
+
+// What the user decided for a row: the category to file it under, or to leave it out.
+// `suggested` is set while the category is still the one that was suggested, so the note
+// saying why stays visible; choosing a category by hand clears it.
 export type ImportChoice = {
   categoryId: string | null;
   skipped: boolean;
+  suggested?: SuggestionSource;
 };
 
 // Both limits are checked again on the server for what actually arrives there

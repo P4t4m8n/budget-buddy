@@ -204,6 +204,7 @@ export default function TransactionsTable({
       <ImportDialog
         open={importing}
         categories={expenseCategories}
+        transactions={rows}
         onClose={() => setImporting(false)}
       />
     </div>

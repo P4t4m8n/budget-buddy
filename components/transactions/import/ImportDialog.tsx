@@ -20,11 +20,18 @@ export default function ImportDialog({
   open,
   onClose,
   categories,
+  transactions,
 }: {
   open: boolean;
   onClose: () => void;
   // The user's expense categories
   categories: Category[];
+  // The user's existing transactions, newest first, to suggest categories from
+  transactions: ReadonlyArray<{
+    description: string;
+    categoryId: string;
+    type: "INCOME" | "EXPENSE";
+  }>;
 }) {
   const { markStale, refreshIfStale } = useRefreshWhenStale();
   const [busy, setBusy] = useState(false);
@@ -46,6 +53,7 @@ export default function ImportDialog({
     >
       <ImportFlow
         categories={categories}
+        transactions={transactions}
         titleId={titleId}
         onClose={close}
         onBusyChange={setBusy}

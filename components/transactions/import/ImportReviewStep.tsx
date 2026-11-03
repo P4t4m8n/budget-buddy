@@ -9,10 +9,16 @@ import SelectField from "@/components/ui/SelectField";
 
 // ---Lib---
 import { formatCurrency } from "@/lib/format";
-import type { ImportChoice, ImportRow } from "@/lib/import/types";
+import type { Suggestion } from "@/lib/import/suggest";
+import type { ImportChoice, ImportRow, SuggestionSource } from "@/lib/import/types";
 
 // ---Types---
 import type { Category } from "@/types/finance";
+
+const suggestionNote = (source: SuggestionSource, categoryName: string) =>
+  source === "import"
+    ? `Suggested: you chose ${categoryName} for the same description earlier in this import.`
+    : `Suggested: your existing transactions with this description are in ${categoryName}.`;
 
 // One row of the file at a time: the user picks its category, or skips it
 export default function ImportReviewStep({
@@ -20,6 +26,7 @@ export default function ImportReviewStep({
   position,
   categories,
   choices,
+  suggestion,
   onChoose,
   onSkip,
   onPrevious,
@@ -30,6 +37,8 @@ export default function ImportReviewStep({
   // The user's expense categories
   categories: Category[];
   choices: Record<number, ImportChoice | undefined>;
+  // For a row nothing has been chosen for yet: shown as chosen until the user changes it
+  suggestion: Suggestion | null;
   onChoose: (sourceRow: number, categoryId: string) => void;
   onSkip: (sourceRow: number) => void;
   onPrevious: () => void;
@@ -39,7 +48,11 @@ export default function ImportReviewStep({
   const row = rows[position];
   const choice = choices[row.sourceRow];
   const last = position === rows.length - 1;
-  const decided = Boolean(choice?.categoryId) || Boolean(choice?.skipped);
+  const selected = choice?.categoryId ?? suggestion?.categoryId ?? "";
+  const decided = selected !== "" || Boolean(choice?.skipped);
+  // Why the category is what it is, for as long as it is still the suggested one
+  const suggestedFrom = choice ? choice.suggested : suggestion?.source;
+  const selectedName = categories.find((category) => category.id === selected)?.name;
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,7 +102,7 @@ export default function ImportReviewStep({
         <SelectField
           labelId={labelId}
           placeholder="Choose a category"
-          value={choice?.categoryId ?? ""}
+          value={selected}
           onChange={(categoryId) => onChoose(row.sourceRow, categoryId)}
           options={categories.map((category) => ({
             value: category.id,
@@ -101,6 +114,10 @@ export default function ImportReviewStep({
       {choice?.skipped ? (
         <p className="text-sm text-amber-400">
           Skipped: this row won&apos;t be imported. Choose a category to include it again.
+        </p>
+      ) : suggestedFrom && selectedName ? (
+        <p className="text-sm text-emerald-400">
+          {suggestionNote(suggestedFrom, selectedName)} Change it if it&apos;s wrong.
         </p>
       ) : (
         <p className="text-xs text-neutral-500">

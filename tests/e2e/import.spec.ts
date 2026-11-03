@@ -8,6 +8,7 @@ import {
   hideNextDevIndicator,
   removeCategoryRow,
   seedCategory,
+  seedTransaction,
   signUp,
   test,
   transactionsOf,
@@ -639,6 +640,199 @@ test.describe("importing", () => {
     await page.locator("aside").getByRole("link", { name: "Budget", exact: true }).click();
 
     await expectReadable(page.getByRole("listitem", { name: "Groceries", exact: true }), "120 ₪ spent · no budget");
+  });
+});
+
+const csvOf = (...lines: string[]) => csvFile(["Date,Description,Amount", ...lines].join("\n"));
+const categoryBox = (page: Page) => dialog(page).getByRole("combobox", { name: "Category" });
+const IMPORT_NOTE = (name: string) =>
+  `Suggested: you chose ${name} for the same description earlier in this import.`;
+const HISTORY_NOTE = (name: string) =>
+  `Suggested: your existing transactions with this description are in ${name}.`;
+
+test.describe("suggested categories", () => {
+  test("pre-selects what was chosen earlier in this import for the same description", async ({ page }) => {
+    const { userId, groceries, eatingOut } = await setUp(page);
+    await startReview(
+      page,
+      csvOf("30/10/2026,Supersal,-245.30", "31/10/2026,Cafe,-18", "01/11/2026,  SUPERSAL ,-45.10"),
+    );
+    await expect(categoryBox(page)).toHaveText("Choose a category");
+    await chooseCategory(page, "Groceries");
+    await next(page);
+    await chooseCategory(page, "Eating out");
+    await next(page);
+
+    await expect(dialog(page)).toContainText("Row 3 of 3");
+    await expect(categoryBox(page)).toHaveText("Groceries");
+    await expect(dialog(page)).toContainText(IMPORT_NOTE("Groceries"));
+    await expect(dialog(page).getByRole("button", { name: "Review", exact: true })).toBeEnabled();
+
+    await dialog(page).getByRole("button", { name: "Review", exact: true }).click();
+    await expectReadable(dialog(page).getByRole("table").getByRole("row").nth(1), "Groceries2290.40 ₪");
+    await dialog(page).getByRole("button", { name: "Import 3 transactions" }).click();
+
+    await expect(dialog(page)).toContainText("Imported 3 transactions.");
+    expect((await transactionsOf(userId)).map((t) => t.categoryId)).toEqual([groceries, eatingOut, groceries]);
+  });
+
+  test("suggests from the user's existing transactions, the most used category first", async ({ page }) => {
+    const { userId, groceries, health } = await setUp(page);
+    await seedTransaction(userId, health, { description: "Supersal", amount: 10, date: "2026-09-01" });
+    await seedTransaction(userId, groceries, { description: "Supersal", amount: 20, date: "2026-09-02" });
+    await seedTransaction(userId, groceries, { description: "supersal", amount: 30, date: "2026-09-03" });
+
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30"));
+
+    await expect(categoryBox(page)).toHaveText("Groceries");
+    await expect(dialog(page)).toContainText(HISTORY_NOTE("Groceries"));
+    await expect(dialog(page).getByRole("button", { name: "Review", exact: true })).toBeEnabled();
+  });
+
+  test("on a tie between categories, suggests the one used most recently", async ({ page }) => {
+    const { userId, groceries, health } = await setUp(page);
+    await seedTransaction(userId, groceries, { description: "Supersal", amount: 10, date: "2026-09-01" });
+    await seedTransaction(userId, health, { description: "Supersal", amount: 20, date: "2026-10-01" });
+
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30"));
+
+    await expect(categoryBox(page)).toHaveText("Health");
+  });
+
+  test("prefers this import's choice to the existing transactions", async ({ page }) => {
+    const { userId, groceries } = await setUp(page);
+    await seedTransaction(userId, groceries, { description: "Supersal", amount: 10, date: "2026-09-01" });
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30", "31/10/2026,Supersal,-18"));
+    await expect(categoryBox(page)).toHaveText("Groceries");
+    await expect(dialog(page)).toContainText(HISTORY_NOTE("Groceries"));
+
+    await chooseCategory(page, "Health");
+    await next(page);
+
+    await expect(categoryBox(page)).toHaveText("Health");
+    await expect(dialog(page)).toContainText(IMPORT_NOTE("Health"));
+  });
+
+  test("the user can change a suggestion, and the note goes away", async ({ page }) => {
+    const { userId, groceries, health } = await setUp(page);
+    await seedTransaction(userId, groceries, { description: "Supersal", amount: 10, date: "2026-09-01" });
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30"));
+    await expect(dialog(page)).toContainText(HISTORY_NOTE("Groceries"));
+
+    await chooseCategory(page, "Health");
+
+    await expect(categoryBox(page)).toHaveText("Health");
+    await expect(dialog(page)).not.toContainText("Suggested:");
+    await dialog(page).getByRole("button", { name: "Review", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Import 1 transaction" }).click();
+    await expect(dialog(page)).toContainText("Imported 1 transaction.");
+    expect((await transactionsOf(userId)).filter((t) => t.date === "2026-10-30")).toMatchObject([{ categoryId: health }]);
+  });
+
+  test("suggests nothing for a description it hasn't seen, and a number makes it a different one", async ({ page }) => {
+    const { userId, groceries } = await setUp(page);
+    await seedTransaction(userId, groceries, { description: "Supersal 1234", amount: 10, date: "2026-09-01" });
+
+    await startReview(page, csvOf("30/10/2026,Supersal 5678,-245.30", "31/10/2026,Bakery,-18"));
+
+    await expect(categoryBox(page)).toHaveText("Choose a category");
+    await expect(dialog(page)).not.toContainText("Suggested:");
+    await expect(dialog(page).getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  });
+
+  test("doesn't learn from a row that was skipped, even one that had a category", async ({ page }) => {
+    await setUp(page);
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30", "31/10/2026,Supersal,-18"));
+    await chooseCategory(page, "Groceries");
+
+    await dialog(page).getByRole("button", { name: "Skip", exact: true }).click();
+
+    await expect(dialog(page)).toContainText("Row 2 of 2");
+    await expect(categoryBox(page)).toHaveText("Choose a category");
+    await expect(dialog(page)).not.toContainText("Suggested:");
+  });
+
+  test("ignores existing income with the same description", async ({ page }) => {
+    const { userId, salary } = await setUp(page);
+    await seedTransaction(userId, salary, { description: "Supersal", amount: 10, date: "2026-09-01", type: "INCOME" });
+
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30"));
+
+    await expect(categoryBox(page)).toHaveText("Choose a category");
+  });
+
+  test("follows a change to an earlier row until the user moves on", async ({ page }) => {
+    await setUp(page);
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30", "31/10/2026,Supersal,-18"));
+    await chooseCategory(page, "Groceries");
+    await next(page);
+    await expect(categoryBox(page)).toHaveText("Groceries");
+
+    await dialog(page).getByRole("button", { name: "Back", exact: true }).click();
+    await chooseCategory(page, "Health");
+    await next(page);
+
+    await expect(dialog(page)).toContainText("Row 2 of 2");
+    await expect(categoryBox(page)).toHaveText("Health");
+    await expect(dialog(page)).toContainText(IMPORT_NOTE("Health"));
+  });
+
+  test("keeps an accepted suggestion, and its note, when coming back to the row", async ({ page }) => {
+    await setUp(page);
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30", "31/10/2026,Supersal,-18", "01/11/2026,Cafe,-5"));
+    await chooseCategory(page, "Groceries");
+    await next(page);
+    await next(page);
+    await expect(dialog(page)).toContainText("Row 3 of 3");
+
+    await dialog(page).getByRole("button", { name: "Back", exact: true }).click();
+
+    await expect(dialog(page)).toContainText("Row 2 of 3");
+    await expect(categoryBox(page)).toHaveText("Groceries");
+    await expect(dialog(page)).toContainText(IMPORT_NOTE("Groceries"));
+  });
+
+  test("skipping a suggested row leaves it out instead of accepting the suggestion", async ({ page }) => {
+    const { userId } = await setUp(page);
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30", "31/10/2026,Supersal,-18"));
+    await chooseCategory(page, "Groceries");
+    await next(page);
+    await expect(categoryBox(page)).toHaveText("Groceries");
+
+    await dialog(page).getByRole("button", { name: "Skip", exact: true }).click();
+
+    await expectReadable(dialog(page), "1 transaction will be added,245.30 ₪in total; 1 row was skipped.");
+    await dialog(page).getByRole("button", { name: "Import 1 transaction" }).click();
+    await expect(dialog(page)).toContainText("Imported 1 transaction.");
+    expect(await transactionsOf(userId)).toHaveLength(1);
+  });
+
+  test("matches Hebrew descriptions too", async ({ page }) => {
+    await setUp(page);
+    await startReview(page, csvOf("30/10/2026,שופרסל דיל,-245.30", "31/10/2026,שופרסל  דיל ,-18"));
+    await chooseCategory(page, "Groceries");
+    await next(page);
+
+    await expect(categoryBox(page)).toHaveText("Groceries");
+    await expect(dialog(page)).toContainText(IMPORT_NOTE("Groceries"));
+  });
+
+  test("learns from what a previous import added", async ({ page }) => {
+    await setUp(page);
+    await startReview(page, csvOf("30/10/2026,Supersal,-245.30"));
+    await chooseCategory(page, "Health");
+    await dialog(page).getByRole("button", { name: "Review", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Import 1 transaction" }).click();
+    await expect(dialog(page)).toContainText("Imported 1 transaction.");
+    await dialog(page).getByRole("button", { name: "Done" }).click();
+    await expect(dialog(page)).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Import from file" }).click();
+    await upload(page, csvOf("05/11/2026,Supersal,-60"));
+    await dialog(page).getByRole("button", { name: "Continue" }).click();
+
+    await expect(categoryBox(page)).toHaveText("Health");
+    await expect(dialog(page)).toContainText(HISTORY_NOTE("Health"));
   });
 });
 

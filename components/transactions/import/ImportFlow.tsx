@@ -16,6 +16,7 @@ import Button from "@/components/ui/Button";
 
 // ---Lib---
 import { summarizeImport } from "@/lib/import/summary";
+import { buildCategoryHistory, suggestCategory } from "@/lib/import/suggest";
 import { detectMapping, findHeaderRow } from "@/lib/import/table";
 import type {
   ColumnMapping,
@@ -43,6 +44,7 @@ const nothing: ColumnMapping = { date: null, description: null, amount: null };
 // reaches the server until the very end, when the user confirms.
 export default function ImportFlow({
   categories,
+  transactions,
   titleId,
   onClose,
   onBusyChange,
@@ -50,6 +52,12 @@ export default function ImportFlow({
 }: {
   // The user's expense categories
   categories: Category[];
+  // What the user already has, newest first: categories are suggested from it
+  transactions: ReadonlyArray<{
+    description: string;
+    categoryId: string;
+    type: "INCOME" | "EXPENSE";
+  }>;
   titleId: string;
   onClose: () => void;
   onBusyChange: (busy: boolean) => void;
@@ -71,10 +79,26 @@ export default function ImportFlow({
     () => new Map(categories.map((category) => [category.id, category.name])),
     [categories],
   );
+  const validCategoryIds = useMemo(
+    () => new Set(categories.map((category) => category.id)),
+    [categories],
+  );
+  const history = useMemo(
+    () => buildCategoryHistory(transactions, validCategoryIds),
+    [transactions, validCategoryIds],
+  );
   const summary = useMemo(
     () => summarizeImport(rows, choices, categoryNames),
     [rows, choices, categoryNames],
   );
+
+  // A suggestion is only shown for a row that hasn't been decided yet. It isn't a choice
+  // until the user moves on with Next, so it follows any change made to earlier rows.
+  const currentRow = rows[position];
+  const suggestion =
+    stage === "review" && currentRow && !choices[currentRow.sourceRow]
+      ? suggestCategory(rows, position, choices, history, validCategoryIds)
+      : null;
 
   function fileLoaded(name: string, loaded: Table) {
     const header = findHeaderRow(loaded) ?? 0;
@@ -106,12 +130,27 @@ export default function ImportFlow({
       ...current,
       [sourceRow]: { categoryId: current[sourceRow]?.categoryId ?? null, skipped: true },
     }));
-    next();
+    advance();
   }
 
-  function next() {
+  function advance() {
     if (position < rows.length - 1) setPosition(position + 1);
     else setStage("summary");
+  }
+
+  // Moving on accepts what the row shows, including a category that was only suggested
+  function next() {
+    if (currentRow && suggestion) {
+      setChoices((current) => ({
+        ...current,
+        [currentRow.sourceRow]: {
+          categoryId: suggestion.categoryId,
+          skipped: false,
+          suggested: suggestion.source,
+        },
+      }));
+    }
+    advance();
   }
 
   function runImport() {
@@ -174,6 +213,7 @@ export default function ImportFlow({
           position={position}
           categories={categories}
           choices={choices}
+          suggestion={suggestion}
           onChoose={choose}
           onSkip={skip}
           onPrevious={() => setPosition(Math.max(position - 1, 0))}
