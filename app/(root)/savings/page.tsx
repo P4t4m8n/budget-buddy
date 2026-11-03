@@ -2,33 +2,21 @@ import { Suspense } from "react";
 import SummaryCard from "@/components/dashboard/SummaryCard";
 import PageHeader from "@/components/layout/PageHeader";
 import GoalDialog from "@/components/savings/GoalDialog";
+import InvestmentHistoryChart from "@/components/savings/InvestmentHistoryChart";
 import InvestmentsChart from "@/components/savings/InvestmentsChart";
 import InvestmentsTable from "@/components/savings/InvestmentsTable";
 import SavingsGoalCard from "@/components/savings/SavingsGoalCard";
+import { getInvestmentsOverview } from "@/lib/data/investments";
 import { getSavingsOverview } from "@/lib/data/savings";
 import { formatCurrency } from "@/lib/format";
-import { investments } from "@/lib/mock-data";
 
-const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
+const panel = "rounded-xl border border-white/10 bg-neutral-900 p-5";
 
 async function SavingsContent() {
-  const { goals, totalSaved } = await getSavingsOverview();
-
-  // Investments are still mock data until they are wired to the database
-  const rows = investments.map((i) => ({
-    id: i.id,
-    name: i.name,
-    type: i.type,
-    ticker: i.ticker ?? "-",
-    amountInvested: i.amountInvested,
-    currentValue: i.currentValue,
-    currency: i.currency,
-    gainPercent: ((i.currentValue - i.amountInvested) / i.amountInvested) * 100,
-  }));
-
-  const totalInvested = sum(rows.map((r) => r.amountInvested));
-  const portfolioValue = sum(rows.map((r) => r.currentValue));
-  const gain = portfolioValue - totalInvested;
+  const [
+    { goals, totalSaved },
+    { investments, totalInvested, portfolioValue, gain, history },
+  ] = await Promise.all([getSavingsOverview(), getInvestmentsOverview()]);
 
   const skeleton = <div className="h-80 animate-pulse rounded-lg bg-white/5" />;
 
@@ -65,17 +53,36 @@ async function SavingsContent() {
       )}
 
       <h2 className="mt-8 mb-4 text-lg font-semibold">Investments</h2>
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-neutral-900 p-5">
-          <Suspense fallback={skeleton}>
-            <InvestmentsTable rows={rows} />
-          </Suspense>
-        </div>
-        <div className="rounded-xl border border-white/10 bg-neutral-900 p-5">
+      <div className={panel}>
+        <Suspense fallback={skeleton}>
+          <InvestmentsTable rows={investments} />
+        </Suspense>
+      </div>
+
+      <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className={panel}>
           <h3 className="mb-2 font-semibold">Invested vs. current value</h3>
-          <Suspense fallback={skeleton}>
-            <InvestmentsChart rows={rows} />
-          </Suspense>
+          {investments.length > 0 ? (
+            <Suspense fallback={skeleton}>
+              <InvestmentsChart rows={investments} />
+            </Suspense>
+          ) : (
+            <p className="flex h-80 items-center justify-center text-center text-sm text-neutral-400">
+              Add an investment to compare what you put in with what it is worth.
+            </p>
+          )}
+        </div>
+        <div className={panel}>
+          <h3 className="mb-2 font-semibold">Investment value over time</h3>
+          {history.series.length > 0 ? (
+            <Suspense fallback={skeleton}>
+              <InvestmentHistoryChart history={history} />
+            </Suspense>
+          ) : (
+            <p className="flex h-80 items-center justify-center text-center text-sm text-neutral-400">
+              Update an investment&apos;s value to build its history.
+            </p>
+          )}
         </div>
       </section>
     </>

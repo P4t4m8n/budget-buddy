@@ -1,11 +1,40 @@
 import { describe, expect, it } from "vitest";
 import {
   addMonths,
+  currentDate,
   currentMonth,
   monthBounds,
   parseMonth,
   recentMonths,
 } from "@/lib/dates";
+
+describe("currentDate", () => {
+  it("uses the day in the given timezone, not the server's", () => {
+    // 22:30 UTC on Oct 31 is already Nov 1 in Israel (UTC+2 after daylight saving ends)
+    const lateOctoberUtc = new Date("2026-10-31T22:30:00Z");
+
+    expect(currentDate(lateOctoberUtc, "UTC")).toBe("2026-10-31");
+    expect(currentDate(lateOctoberUtc, "Asia/Jerusalem")).toBe("2026-11-01");
+  });
+
+  it("can be behind UTC too", () => {
+    expect(currentDate(new Date("2026-11-01T02:00:00Z"), "America/New_York")).toBe("2026-10-31");
+  });
+
+  it("handles the turn of the year", () => {
+    expect(currentDate(new Date("2026-12-31T22:30:00Z"), "Asia/Jerusalem")).toBe("2027-01-01");
+  });
+
+  it("pads single-digit months and days", () => {
+    expect(currentDate(new Date("2026-03-05T12:00:00Z"), "Asia/Jerusalem")).toBe("2026-03-05");
+  });
+
+  it("follows the same month as currentMonth", () => {
+    const now = new Date("2026-02-28T23:30:00Z");
+
+    expect(currentDate(now, "Asia/Jerusalem").slice(0, 7)).toBe(currentMonth(now, "Asia/Jerusalem"));
+  });
+});
 
 describe("parseMonth", () => {
   it.each(["2026-10", "2026-01", "2026-12", "2000-01", "2099-12"])("accepts %s", (month) => {

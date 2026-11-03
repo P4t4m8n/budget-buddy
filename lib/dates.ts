@@ -15,6 +15,15 @@ export const currentMonth = (now: Date, timeZone: string) => {
   return `${part("year")}-${part("month")}`;
 };
 
+// The day it currently is for the user, "YYYY-MM-DD"
+export const currentDate = (now: Date, timeZone: string) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+
 // A month taken from user input such as ?month=2026-10; undefined when it isn't one
 export const parseMonth = (value: unknown) =>
   typeof value === "string" && /^20\d{2}-(0[1-9]|1[0-2])$/.test(value)

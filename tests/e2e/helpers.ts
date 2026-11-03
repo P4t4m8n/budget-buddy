@@ -2,12 +2,15 @@ import { expect, test as base, type BrowserContext, type Locator, type Page } fr
 import { randomUUID } from "node:crypto";
 import { Pool, type QueryResultRow } from "pg";
 import { APP_TIME_ZONE } from "../../lib/constants";
-import { currentMonth } from "../../lib/dates";
+import { currentDate, currentMonth } from "../../lib/dates";
 import { getTestDatabaseUrl } from "../setup/test-db";
 import { E2E_EMAIL_DOMAIN } from "./env";
 
 // The pages work out "this month" themselves; the tests ask the same helper, so they agree
 export const thisMonth = () => currentMonth(new Date(), APP_TIME_ZONE);
+
+// Today as the app sees it, which can differ from the machine's own date
+export const today = () => currentDate(new Date(), APP_TIME_ZONE);
 
 export const day = (month: string, dayOfMonth: number) =>
   `${month}-${String(dayOfMonth).padStart(2, "0")}`;
@@ -407,6 +410,70 @@ export async function removeGoalRow(id: string) {
 // Simulates another tab or device deleting the deposit
 export async function removeDepositRow(id: string) {
   await pool.query('delete from "SavingsDeposit" where id = $1', [id]);
+}
+
+export type SeededInvestment = {
+  name: string;
+  type?: "STOCK" | "ETF" | "CRYPTO" | "BOND" | "OTHER";
+  ticker?: string | null;
+  invested?: number | string;
+  value?: number | string;
+  purchaseDate?: string;
+};
+
+export async function seedInvestment(
+  userId: string,
+  { name, type = "ETF", ticker = null, invested = 1000, value = 1000, purchaseDate = "2025-03-10" }: SeededInvestment,
+) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "Investment" (id, "userId", name, type, ticker, "amountInvested", "currentValue", "purchaseDate")
+     values ($1, $2, $3, $4::"InvestmentType", $5, $6, $7, $8::date)`,
+    [id, userId, name, type, ticker, invested, value, purchaseDate],
+  );
+  return id;
+}
+
+export async function seedSnapshot(userId: string, investmentId: string, date: string, value: number | string) {
+  await pool.query(
+    `insert into "InvestmentSnapshot" (id, "userId", "investmentId", date, value)
+     values ($1, $2, $3, $4::date, $5)`,
+    [randomUUID(), userId, investmentId, date, value],
+  );
+}
+
+export async function investmentsOf(userId: string) {
+  const { rows } = await pool.query<{
+    id: string;
+    name: string;
+    type: string;
+    ticker: string | null;
+    amountInvested: string;
+    currentValue: string;
+    currency: string;
+    purchaseDate: string;
+  }>(
+    `select id, name, type, ticker, "amountInvested"::text as "amountInvested",
+            "currentValue"::text as "currentValue", currency,
+            to_char("purchaseDate", 'YYYY-MM-DD') as "purchaseDate"
+     from "Investment" where "userId" = $1 order by name`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function snapshotsOf(investmentId: string) {
+  const { rows } = await pool.query<{ date: string; value: string }>(
+    `select to_char(date, 'YYYY-MM-DD') as date, value::text as value
+     from "InvestmentSnapshot" where "investmentId" = $1 order by date`,
+    [investmentId],
+  );
+  return rows;
+}
+
+// Simulates another tab or device deleting the investment (its history goes with it)
+export async function removeInvestmentRow(id: string) {
+  await pool.query('delete from "Investment" where id = $1', [id]);
 }
 
 // Simulates another tab or device buying the item
