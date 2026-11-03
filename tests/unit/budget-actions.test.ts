@@ -33,10 +33,13 @@ const form = (fields: Record<string, string>) => {
 const idle = { status: "idle" } as const;
 const valid = { categoryId: "cat-1", month: "2026-10", limit: "2400" };
 
+// The dashboard shows the month's budgets too, so every budget change refreshes both pages
+const refreshedPaths = () => vi.mocked(revalidatePath).mock.calls.map(([path]) => path).sort();
+
 beforeEach(() => vi.resetAllMocks());
 
 describe("setBudgetAction", () => {
-  it("sets the budget from cleaned-up input and refreshes the budget page", async () => {
+  it("sets the budget from cleaned-up input and refreshes the budget page and the dashboard", async () => {
     const result = await setBudgetAction(idle, form({ ...valid, limit: " 2400.50 " }));
 
     expect(result).toEqual({ status: "success" });
@@ -46,7 +49,7 @@ describe("setBudgetAction", () => {
       limit: 2400.5,
       currency: "ILS",
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/budget");
+    expect(refreshedPaths()).toEqual(["/budget", "/dashboard"]);
   });
 
   it("never lets the client choose the owner, id or currency", async () => {
@@ -115,7 +118,7 @@ describe("deleteBudgetAction", () => {
   it("deletes and refreshes the budget page", async () => {
     expect(await deleteBudgetAction("b-1")).toEqual({ ok: true });
     expect(deleteBudget).toHaveBeenCalledWith("b-1");
-    expect(revalidatePath).toHaveBeenCalledWith("/budget");
+    expect(refreshedPaths()).toEqual(["/budget", "/dashboard"]);
   });
 
   it("reports a budget that no longer exists, leaving the refresh to the dialog", async () => {
@@ -152,7 +155,7 @@ describe("setGeneralBudgetAction", () => {
 
     expect(result).toEqual({ status: "success" });
     expect(setGeneralBudget).toHaveBeenCalledWith({ month: "2026-10", limit: 4000.5, currency: "ILS" });
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith("/budget");
+    expect(refreshedPaths()).toEqual(["/budget", "/dashboard"]);
   });
 
   it("never lets the client choose the owner, id, category or currency", async () => {
@@ -204,7 +207,7 @@ describe("deleteGeneralBudgetAction", () => {
   it("deletes and refreshes the budget page", async () => {
     expect(await deleteGeneralBudgetAction("m-1")).toEqual({ ok: true });
     expect(deleteGeneralBudget).toHaveBeenCalledWith("m-1");
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith("/budget");
+    expect(refreshedPaths()).toEqual(["/budget", "/dashboard"]);
   });
 
   it("reports a monthly budget that no longer exists, leaving the refresh to the dialog", async () => {

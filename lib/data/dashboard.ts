@@ -5,11 +5,13 @@ import { APP_TIME_ZONE, BASE_CURRENCY } from "@/lib/constants";
 import { currentMonth, monthBounds, recentMonths } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import type {
+  BudgetedRow,
   Dashboard,
   MonthlyTotals,
   SpendingSlice,
 } from "@/types/dashboard";
 import type { TransactionType } from "@/types/finance";
+import { getBudgetOverview } from "./budgets";
 import { getCategories } from "./categories";
 import { fromDateString, toNumber } from "./serialize";
 import { getRecentTransactions } from "./transactions";
@@ -50,7 +52,7 @@ export const getDashboard = async (
   const thisMonth = monthBounds(month);
   const chartStart = monthBounds(months[0]).start;
 
-  const [balanceRows, monthlyRows, spendingRows, categories, recent, saved] =
+  const [balanceRows, monthlyRows, spendingRows, categories, recent, saved, budgets] =
     await Promise.all([
       prisma.transaction.groupBy({
         by: ["type"],
@@ -87,7 +89,15 @@ export const getDashboard = async (
         where: { userId: user.id, goal: { currency: BASE_CURRENCY } },
         _sum: { amount: true },
       }),
+      // Same month and clock as the rest of the dashboard
+      getBudgetOverview({ month, now }),
     ]);
+
+  // Only budgeted categories, the ones using the most of their budget first, so the ones
+  // close to or over their limit are on top
+  const budgetedCategories = budgets.rows
+    .filter((row): row is BudgetedRow => row.budgetId !== null && row.limit !== null)
+    .sort((a, b) => b.spent / b.limit - a.spent / a.limit || a.name.localeCompare(b.name));
 
   const balance = zero();
   for (const row of balanceRows) {
@@ -127,6 +137,11 @@ export const getDashboard = async (
     month,
     balance: toNumber(balance.income.minus(balance.expense)),
     totalSaved: toNumber(saved._sum.amount ?? new Prisma.Decimal(0)),
+    budget: {
+      general: budgets.general,
+      totalSpent: budgets.totalSpent,
+      categories: budgetedCategories,
+    },
     income: current.income,
     spending: current.expenses,
     spendingByCategory,

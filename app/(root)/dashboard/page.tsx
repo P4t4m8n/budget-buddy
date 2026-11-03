@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/layout/PageHeader";
 import MonthlyOverviewChart from "@/components/dashboard/MonthlyOverviewChart";
+import BudgetProgress from "@/components/dashboard/BudgetProgress";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import SpendingByCategoryChart from "@/components/dashboard/SpendingByCategoryChart";
 import SummaryCard from "@/components/dashboard/SummaryCard";
@@ -21,6 +22,7 @@ async function DashboardContent() {
     month,
     balance,
     totalSaved,
+    budget,
     income,
     spending,
     spendingByCategory,
@@ -54,6 +56,8 @@ async function DashboardContent() {
         />
         <SummaryCard label="Total saved" value={formatCurrency(totalSaved)} />
       </section>
+
+      <BudgetProgress month={month} budget={budget} />
 
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className={panel}>

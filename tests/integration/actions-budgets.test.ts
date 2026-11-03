@@ -58,7 +58,7 @@ describe("budget Server Actions against the database", () => {
     expect(row).toMatchObject({ categoryId: aliceFood, currency: "ILS" });
     expect(row.limit.toString()).toBe("1200.5");
     expect(row.month.toISOString()).toBe("2026-10-01T00:00:00.000Z");
-    expect(revalidatePath).toHaveBeenCalledWith("/budget");
+    expect(vi.mocked(revalidatePath).mock.calls.map(([path]) => path).sort()).toEqual(["/budget", "/dashboard"]);
   });
 
   it("changes the limit when setting it again", async () => {
@@ -141,7 +141,7 @@ describe("monthly budget Server Actions against the database", () => {
     expect(row.currency).toBe("ILS");
     expect(row.limit.toString()).toBe("4000.5");
     expect(row.month.toISOString()).toBe("2026-10-01T00:00:00.000Z");
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith("/budget");
+    expect(vi.mocked(revalidatePath).mock.calls.map(([path]) => path).sort()).toEqual(["/budget", "/dashboard"]);
   });
 
   it("changes the limit when setting it again", async () => {

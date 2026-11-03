@@ -365,6 +365,193 @@ describe("getDashboard", () => {
     });
   });
 
+  describe("budget", () => {
+    const THIS_MONTH = new Date("2026-10-01T00:00:00Z");
+    const budgetFor = (categoryId: string, limit: number | string, month = THIS_MONTH, userId = alice.id) =>
+      prisma.budget.create({ data: { userId, categoryId, month, limit } });
+    const generalFor = (limit: number | string, month = THIS_MONTH, userId = alice.id) =>
+      prisma.monthlyBudget.create({ data: { userId, month, limit } });
+
+    it("is empty when no budget is set", async () => {
+      await seed([{ category: aliceCategories.food, amount: 120, date: "2026-10-04" }]);
+
+      expect((await getDashboard({ now: NOW })).budget).toEqual({
+        general: null,
+        totalSpent: 120,
+        categories: [],
+      });
+    });
+
+    it("has the monthly budget with what is left of it", async () => {
+      await generalFor("4000.50");
+      await seed([
+        { category: aliceCategories.food, amount: "430.25", date: "2026-10-04" },
+        { category: aliceCategories.rent, amount: 2400, date: "2026-10-02" },
+      ]);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.totalSpent).toBe(2830.25);
+      expect(budget.general).toEqual({
+        budgetId: expect.any(String),
+        limit: 4000.5,
+        currency: "ILS",
+        remaining: 1170.25,
+      });
+    });
+
+    it("counts every expense against the monthly budget, but not income, other months or other currencies", async () => {
+      await generalFor(1000);
+      await seed([
+        { category: aliceCategories.food, amount: 100, date: "2026-10-04" },
+        { category: aliceCategories.fun, amount: 50, date: "2026-10-05" },
+        { category: aliceCategories.salary, type: "INCOME", amount: 7200, date: "2026-10-01" },
+        { category: aliceCategories.food, amount: 900, date: "2026-09-30" },
+        { category: aliceCategories.food, amount: 900, date: "2026-11-01" },
+        { category: aliceCategories.food, amount: 900, date: "2026-10-06", currency: "USD" },
+      ]);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.totalSpent).toBe(150);
+      expect(budget.general?.remaining).toBe(850);
+    });
+
+    it("lists only the categories that have a budget, with what was spent in each", async () => {
+      await budgetFor(aliceCategories.food, 1200);
+      await budgetFor(aliceCategories.rent, "2400.50");
+      await seed([
+        { category: aliceCategories.food, amount: "430.25", date: "2026-10-04" },
+        { category: aliceCategories.rent, amount: 2400, date: "2026-10-02" },
+        // No budget of its own
+        { category: aliceCategories.fun, amount: 80, date: "2026-10-09" },
+      ]);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.categories).toEqual([
+        {
+          categoryId: aliceCategories.rent,
+          name: "Rent",
+          color: "#6366f1",
+          budgetId: expect.any(String),
+          limit: 2400.5,
+          currency: "ILS",
+          spent: 2400,
+        },
+        {
+          categoryId: aliceCategories.food,
+          name: "Groceries",
+          color: "#f59e0b",
+          budgetId: expect.any(String),
+          limit: 1200,
+          currency: "ILS",
+          spent: 430.25,
+        },
+      ]);
+    });
+
+    it("puts the categories using the most of their budget first, over-budget ones on top", async () => {
+      await budgetFor(aliceCategories.food, 1000);
+      await budgetFor(aliceCategories.rent, 1000);
+      await budgetFor(aliceCategories.fun, 1000);
+      await seed([
+        { category: aliceCategories.food, amount: 900, date: "2026-10-04" },
+        { category: aliceCategories.rent, amount: 1200, date: "2026-10-02" },
+        { category: aliceCategories.fun, amount: 100, date: "2026-10-09" },
+      ]);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.categories.map((c) => [c.name, c.spent])).toEqual([
+        ["Rent", 1200],
+        ["Groceries", 900],
+        ["Fun", 100],
+      ]);
+    });
+
+    it("ranks by the share of the budget used, not by the amount", async () => {
+      await budgetFor(aliceCategories.food, 100);
+      await budgetFor(aliceCategories.rent, 10000);
+      await seed([
+        { category: aliceCategories.food, amount: 90, date: "2026-10-04" },
+        { category: aliceCategories.rent, amount: 5000, date: "2026-10-02" },
+      ]);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.categories.map((c) => c.name)).toEqual(["Groceries", "Rent"]);
+    });
+
+    it("orders categories with the same share by name", async () => {
+      await budgetFor(aliceCategories.rent, 500);
+      await budgetFor(aliceCategories.food, 500);
+      await budgetFor(aliceCategories.fun, 500);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.categories.map((c) => c.name)).toEqual(["Fun", "Groceries", "Rent"]);
+    });
+
+    it("lists a budgeted category that has nothing spent yet", async () => {
+      await budgetFor(aliceCategories.food, 500);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.categories).toMatchObject([{ name: "Groceries", limit: 500, spent: 0 }]);
+    });
+
+    it("only has this month's budgets", async () => {
+      await generalFor(900, new Date("2026-09-01T00:00:00Z"));
+      await generalFor(1100, new Date("2026-11-01T00:00:00Z"));
+      await budgetFor(aliceCategories.food, 300, new Date("2026-09-01T00:00:00Z"));
+      await budgetFor(aliceCategories.rent, 400, new Date("2026-11-01T00:00:00Z"));
+      await generalFor(1000);
+      await budgetFor(aliceCategories.fun, 200);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.general?.limit).toBe(1000);
+      expect(budget.categories.map((c) => c.name)).toEqual(["Fun"]);
+    });
+
+    it("follows the user's own month: late on Oct 31 in UTC it is already November in Israel", async () => {
+      await generalFor(1000);
+      await generalFor(2000, new Date("2026-11-01T00:00:00Z"));
+
+      const { budget } = await getDashboard({ now: new Date("2026-10-31T22:30:00Z") });
+
+      expect(budget.general?.limit).toBe(2000);
+    });
+
+    it("adds cents exactly", async () => {
+      await generalFor("1000.10");
+      await seed([
+        { category: aliceCategories.food, amount: "0.10", date: "2026-10-02" },
+        { category: aliceCategories.food, amount: "0.20", date: "2026-10-03" },
+      ]);
+
+      const { budget } = await getDashboard({ now: NOW });
+
+      expect(budget.totalSpent).toBe(0.3);
+      expect(budget.general?.remaining).toBe(999.8);
+    });
+
+    it("only has the signed-in user's budgets", async () => {
+      await generalFor(1000);
+      await budgetFor(aliceCategories.food, 300);
+      const bobFood = await categoryOf(bob.id, "Food", "EXPENSE");
+      await generalFor(50, THIS_MONTH, bob.id);
+      await budgetFor(bobFood, 20, THIS_MONTH, bob.id);
+
+      expect((await getDashboard({ now: NOW })).budget.categories.map((c) => c.name)).toEqual(["Groceries"]);
+      await signInAs(bob);
+      const bobs = (await getDashboard({ now: NOW })).budget;
+      expect(bobs.general?.limit).toBe(50);
+      expect(bobs.categories.map((c) => c.name)).toEqual(["Food"]);
+    });
+  });
+
   it("returns plain data that can be sent to the browser", async () => {
     await seed([{ category: aliceCategories.food, amount: "12.50", date: "2026-10-03" }]);
 
