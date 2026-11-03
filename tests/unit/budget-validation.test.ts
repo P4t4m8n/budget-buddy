@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetInputSchema } from "@/lib/validation/budget";
+import { budgetInputSchema, generalBudgetInputSchema } from "@/lib/validation/budget";
 
 const valid = { categoryId: "cat-1", month: "2026-10", limit: "2400" };
 
@@ -89,5 +89,41 @@ describe("budgetInputSchema", () => {
     expect(result.success).toBe(true);
     expect(result.data).not.toHaveProperty("userId");
     expect(result.data).not.toHaveProperty("id");
+  });
+});
+
+describe("generalBudgetInputSchema", () => {
+  const validGeneral = { month: "2026-10", limit: "4000" };
+  const parseGeneral = (overrides: Record<string, unknown> = {}) =>
+    generalBudgetInputSchema.safeParse({ ...validGeneral, ...overrides });
+
+  it("accepts a month and a limit, and fills in the currency", () => {
+    expect(parseGeneral().data).toEqual({ month: "2026-10", limit: 4000, currency: "ILS" });
+  });
+
+  it("has no category: it is for the whole month, and a category in the input is dropped", () => {
+    expect(parseGeneral({ categoryId: "cat-1" }).data).not.toHaveProperty("categoryId");
+  });
+
+  it.each([
+    ["4000", 4000],
+    ["0.01", 0.01],
+    [" 12.50 ", 12.5],
+    ["9999999999.99", 9999999999.99],
+    [500, 500],
+  ])("accepts the limit %j", (limit, expected) => {
+    expect(parseGeneral({ limit }).data?.limit).toBe(expected);
+  });
+
+  it.each(["", "0", "-5", "abc", "1.234", "1e3", "12345678901"])("rejects the limit %j", (limit) => {
+    expect(parseGeneral({ limit }).success).toBe(false);
+  });
+
+  it.each(["", "2026-13", "1999-12", "2026-10-01", "october"])("rejects the month %j", (month) => {
+    expect(parseGeneral({ month }).error?.issues[0].message).toBe("Choose a valid month");
+  });
+
+  it("only allows ILS for now", () => {
+    expect(parseGeneral({ currency: "USD" }).success).toBe(false);
   });
 });

@@ -296,6 +296,30 @@ export async function removeBudgetRow(id: string) {
   await pool.query('delete from "Budget" where id = $1', [id]);
 }
 
+export async function seedMonthlyBudget(userId: string, month: string, limit: number | string) {
+  const id = randomUUID();
+  await pool.query(
+    `insert into "MonthlyBudget" (id, "userId", month, "limit")
+     values ($1, $2, $3::date, $4)`,
+    [id, userId, `${month}-01`, limit],
+  );
+  return id;
+}
+
+export async function monthlyBudgetsOf(userId: string) {
+  const { rows } = await pool.query<{ id: string; month: string; limit: string; currency: string }>(
+    `select id, to_char(month, 'YYYY-MM') as month, "limit"::text as "limit", currency
+     from "MonthlyBudget" where "userId" = $1 order by month`,
+    [userId],
+  );
+  return rows;
+}
+
+// Simulates another tab or device removing the monthly budget
+export async function removeMonthlyBudgetRow(id: string) {
+  await pool.query('delete from "MonthlyBudget" where id = $1', [id]);
+}
+
 export type SeededWishlistItem = {
   name: string;
   price?: number | string;

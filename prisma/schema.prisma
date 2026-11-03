@@ -52,6 +52,7 @@ model User {
   categories          Category[]
   transactions        Transaction[]
   budgets             Budget[]
+  monthlyBudgets      MonthlyBudget[]
   savingsGoals        SavingsGoal[]
   savingsDeposits     SavingsDeposit[]
   investments         Investment[]
@@ -117,6 +118,20 @@ model Budget {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@unique([userId, categoryId, month])
+}
+
+// The general budget for a month: all of the user's expenses count against it, whatever the
+// category. Category budgets (Budget) are separate and don't have to add up to it.
+model MonthlyBudget {
+  id       String   @id @default(cuid())
+  userId   String
+  month    DateTime @db.Date // first day of the month
+  limit    Decimal  @db.Decimal(12, 2)
+  currency Currency @default(ILS)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
 }
 
 model SavingsGoal {

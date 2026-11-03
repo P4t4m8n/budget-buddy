@@ -2,15 +2,13 @@
 import { formatCurrency } from "@/lib/format";
 
 // ---Components---
+import { barColor } from "./bar-color";
 import BudgetDialog from "./BudgetDialog";
 import DeleteBudgetButton from "./DeleteBudgetButton";
 
 // ---Types---
 import type { BudgetRow } from "@/types/budget";
 import type { Currency } from "@/types/finance";
-
-const barColor = (ratio: number) =>
-  ratio > 1 ? "bg-red-500" : ratio >= 0.8 ? "bg-amber-500" : "bg-emerald-500";
 
 // The Hebrew currency format carries right-to-left marks; isolating each amount keeps
 // "spent / limit" from being reordered around them

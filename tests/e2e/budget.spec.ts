@@ -12,10 +12,13 @@ import {
   expectReadable,
   findUser,
   hideNextDevIndicator,
+  monthlyBudgetsOf,
   removeBudgetRow,
   removeCategoryRow,
+  removeMonthlyBudgetRow,
   seedBudget,
   seedCategory,
+  seedMonthlyBudget,
   seedTransaction,
   signUp,
   test,
@@ -422,6 +425,417 @@ test.describe("removing a budget", () => {
     await dialog(page).getByRole("button", { name: "Cancel" }).click();
     await expect(dialog(page)).toHaveCount(0);
     await expectReadable(row(page, "Groceries"), "No budget");
+  });
+});
+
+// The general (monthly) budget card, and one of its figures by label
+const monthly = (page: Page) => page.getByRole("region", { name: "Monthly budget" });
+const figure = (page: Page, label: string) =>
+  monthly(page).locator("dt", { hasText: label }).locator("xpath=following-sibling::dd[1]");
+
+test.describe("the monthly budget", () => {
+  test("asks for one when the month has none, and says what was spent so far", async ({ page }) => {
+    const { userId, groceries } = await setUp(page);
+    const month = thisMonth();
+    await page.goto("/budget");
+
+    await expect(monthly(page).getByText(`No monthly budget for ${formatMonth(month)} yet.`)).toBeVisible();
+    await expect(monthly(page).getByRole("button", { name: "Set monthly budget" })).toBeVisible();
+    await expect(monthly(page).getByText(/spent so far/)).toHaveCount(0);
+
+    await seedTransaction(userId, groceries, { description: "Shop", amount: "80.20", date: day(month, 3) });
+    await page.reload();
+
+    await expectReadable(monthly(page), "(80.20 ₪ spent so far)");
+  });
+
+  test("is there for a user without expense categories too", async ({ page }) => {
+    const account = await signUp(page);
+    await seedCategory(await userIdOf(account), "Salary", "INCOME");
+    await page.goto("/budget");
+
+    await expect(monthly(page).getByRole("button", { name: "Set monthly budget" })).toBeVisible();
+    await expect(page.getByText("Budgets are set per expense category.")).toBeVisible();
+  });
+
+  test("shows the limit, everything spent and what is left, and counts expenses in every category", async ({ page }) => {
+    const { userId, salary, groceries, fun } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 4000);
+    await seedBudget(userId, groceries, month, 1200);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: "430.25", date: day(month, 4) });
+    // No budget of its own, but it still counts against the monthly one
+    await seedTransaction(userId, fun, { description: "Cinema", amount: "80.20", date: day(month, 9) });
+    await seedTransaction(userId, salary, { description: "Pay", amount: 7200, date: day(month, 1), type: "INCOME" });
+
+    await page.goto("/budget");
+
+    await expectReadable(figure(page, "Monthly limit"), "4,000 ₪");
+    await expectReadable(figure(page, "Spent this month"), "510.45 ₪");
+    await expectReadable(figure(page, "Left to spend"), "3,489.55 ₪");
+    await expect(figure(page, "Left to spend")).toHaveClass(/text-emerald-400/);
+    const bar = monthly(page).getByRole("progressbar", { name: "Monthly budget used" });
+    await expect(bar).toHaveAttribute("aria-valuemax", "4000");
+    await expect(bar).toHaveAttribute("aria-valuenow", "510.45");
+    await expect(monthly(page).getByText("You are over your monthly budget.")).toHaveCount(0);
+  });
+
+  test("leaves the category budgets as they were", async ({ page }) => {
+    const { userId, groceries, fun } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 4000);
+    await seedBudget(userId, groceries, month, 1200);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: "430.25", date: day(month, 4) });
+    await seedTransaction(userId, fun, { description: "Cinema", amount: "80.20", date: day(month, 9) });
+
+    await page.goto("/budget");
+
+    await expectAmount(cardValue(page, "Total budget"), "1,200 ₪");
+    await expectAmount(cardValue(page, "Spent"), "430.25 ₪");
+    await expectReadable(row(page, "Groceries"), "430.25 ₪ / 1,200 ₪");
+    await expect(page.getByText(/Plus .*80\.20.* spent in categories without a budget\./)).toBeVisible();
+  });
+
+  test("shows how far over it you are, in red", async ({ page }) => {
+    const { userId, groceries } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 500);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: 650, date: day(month, 4) });
+
+    await page.goto("/budget");
+
+    await expectReadable(figure(page, "Spent this month"), "650 ₪");
+    await expect(figure(page, "Spent this month")).toHaveClass(/text-red-400/);
+    await expectReadable(figure(page, "Over by"), "150 ₪");
+    await expect(figure(page, "Over by")).toHaveClass(/text-red-400/);
+    await expect(monthly(page).getByText("Left to spend")).toHaveCount(0);
+    await expect(monthly(page).getByText("You are over your monthly budget.")).toBeVisible();
+    await expect(monthly(page).getByRole("progressbar", { name: "Monthly budget used" })).toHaveAttribute(
+      "aria-valuenow",
+      "500",
+    );
+  });
+
+  test("isn't over when spending matches it exactly", async ({ page }) => {
+    const { userId, groceries } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 500);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: 500, date: day(month, 4) });
+
+    await page.goto("/budget");
+
+    await expectReadable(figure(page, "Left to spend"), "0 ₪");
+    await expect(monthly(page).getByText("You are over your monthly budget.")).toHaveCount(0);
+  });
+
+  test("tells a category that is over its own budget apart from the monthly budget", async ({ page }) => {
+    const { userId, groceries, rent } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 5000);
+    await seedBudget(userId, groceries, month, 300);
+    await seedBudget(userId, rent, month, 3000);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: 450, date: day(month, 4) });
+    await seedTransaction(userId, rent, { description: "Rent", amount: 2400, date: day(month, 2) });
+
+    await page.goto("/budget");
+
+    await expectReadable(row(page, "Groceries"), "Over budget by 150 ₪");
+    await expectReadable(row(page, "Rent"), "2,400 ₪ / 3,000 ₪");
+    await expect(row(page, "Rent")).not.toContainText("Over budget");
+    await expect(monthly(page).getByText("You are over your monthly budget.")).toHaveCount(0);
+    await expectReadable(figure(page, "Left to spend"), "2,150 ₪");
+  });
+
+  test("can be over while every category is within its own budget", async ({ page }) => {
+    const { userId, groceries, rent } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 1000);
+    await seedBudget(userId, groceries, month, 800);
+    await seedBudget(userId, rent, month, 800);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: 700, date: day(month, 4) });
+    await seedTransaction(userId, rent, { description: "Rent", amount: 700, date: day(month, 2) });
+
+    await page.goto("/budget");
+
+    await expect(monthly(page).getByText("You are over your monthly budget.")).toBeVisible();
+    await expectReadable(figure(page, "Over by"), "400 ₪");
+    await expect(row(page, "Groceries")).not.toContainText("Over budget");
+    await expect(row(page, "Rent")).not.toContainText("Over budget");
+  });
+
+  test("shows what the category budgets add up to, and warns when it is more than the monthly budget", async ({ page }) => {
+    const { userId, groceries, rent } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 1000);
+    await seedBudget(userId, groceries, month, 400);
+    await page.goto("/budget");
+
+    await expectReadable(monthly(page), "Category budgets: 400 ₪ of 1,000 ₪");
+    await expect(monthly(page).getByText(/add up to more than your monthly budget/)).toHaveCount(0);
+
+    await seedBudget(userId, rent, month, 700);
+    await page.reload();
+
+    await expectReadable(monthly(page), "Category budgets: 1,100 ₪ of 1,000 ₪");
+    await expect(monthly(page).getByText("Your category budgets add up to more than your monthly budget.")).toBeVisible();
+  });
+
+  test("doesn't warn when the category budgets add up to exactly the monthly budget", async ({ page }) => {
+    const { userId, groceries, rent } = await setUp(page);
+    const month = thisMonth();
+    await seedMonthlyBudget(userId, month, 1000);
+    await seedBudget(userId, groceries, month, 400);
+    await seedBudget(userId, rent, month, 600);
+
+    await page.goto("/budget");
+
+    await expectReadable(monthly(page), "Category budgets: 1,000 ₪ of 1,000 ₪");
+    await expect(monthly(page).getByText(/add up to more than/)).toHaveCount(0);
+  });
+
+  test("each month has its own", async ({ page }) => {
+    const { userId, groceries } = await setUp(page);
+    const month = thisMonth();
+    const lastMonth = addMonths(month, -1);
+    await seedMonthlyBudget(userId, month, 4000);
+    await seedMonthlyBudget(userId, lastMonth, 3000);
+    await seedTransaction(userId, groceries, { description: "Shop", amount: 250, date: day(lastMonth, 4) });
+    await page.goto("/budget");
+    await expectReadable(figure(page, "Monthly limit"), "4,000 ₪");
+
+    await page.getByRole("link", { name: "Previous month" }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/budget\\?month=${lastMonth}$`));
+    await expectReadable(figure(page, "Monthly limit"), "3,000 ₪");
+    await expectReadable(figure(page, "Spent this month"), "250 ₪");
+
+    await page.getByRole("link", { name: "Next month" }).click();
+    await expect(page).toHaveURL(/\/budget$/);
+    await page.getByRole("link", { name: "Next month" }).click();
+    await expect(page).toHaveURL(new RegExp(`/budget\\?month=${addMonths(month, 1)}$`));
+    await expect(monthly(page).getByText(`No monthly budget for ${formatMonth(addMonths(month, 1))} yet.`)).toBeVisible();
+  });
+
+  test("each user only sees their own", async ({ page, browser }) => {
+    const { userId } = await setUp(page);
+    await seedMonthlyBudget(userId, thisMonth(), 4000);
+    await page.goto("/budget");
+    await expectReadable(figure(page, "Monthly limit"), "4,000 ₪");
+
+    const otherContext = await browser.newContext({ baseURL: "http://localhost:3100" });
+    await hideNextDevIndicator(otherContext);
+    const otherPage = await otherContext.newPage();
+    await signUp(otherPage, "Noa Cohen");
+    await otherPage.goto("/budget");
+
+    await expect(monthly(otherPage).getByText(/No monthly budget for/)).toBeVisible();
+    await expect(monthly(otherPage).getByText("Monthly limit")).toHaveCount(0);
+    await otherContext.close();
+  });
+
+  test("a new transaction is taken off it", async ({ page }) => {
+    const { userId } = await setUp(page);
+    await seedMonthlyBudget(userId, thisMonth(), 1000);
+    await page.goto("/budget");
+    await expectReadable(figure(page, "Left to spend"), "1,000 ₪");
+
+    await page.locator("aside").getByRole("link", { name: "Transactions" }).click();
+    await page.getByRole("button", { name: "Add transaction" }).click();
+    await dialog(page).getByLabel("Description").fill("Weekly shop");
+    await dialog(page).getByLabel("Amount").fill("250");
+    await dialog(page).getByRole("combobox", { name: /Category/ }).click();
+    await page.getByRole("option", { name: "Groceries", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Save" }).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await page.locator("aside").getByRole("link", { name: "Budget", exact: true }).click();
+
+    await expectReadable(figure(page, "Spent this month"), "250 ₪");
+    await expectReadable(figure(page, "Left to spend"), "750 ₪");
+  });
+
+  test.describe("setting it", () => {
+    test("sets the monthly budget for the month being viewed", async ({ page }) => {
+      const { userId } = await setUp(page);
+      const month = thisMonth();
+      await page.goto("/budget");
+
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+
+      await expect(dialog(page).getByRole("heading", { name: "Set monthly budget" })).toBeVisible();
+      await expect(dialog(page)).toContainText(formatMonth(month));
+      await dialog(page).getByLabel(/Limit for the month/).fill("4000.5");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+
+      await expect(dialog(page)).toHaveCount(0);
+      await expectReadable(figure(page, "Monthly limit"), "4,000.50 ₪");
+      await expectReadable(figure(page, "Left to spend"), "4,000.50 ₪");
+      await expect(monthly(page).getByRole("button", { name: "Edit monthly budget" })).toBeVisible();
+      expect(await monthlyBudgetsOf(userId)).toMatchObject([{ month, limit: "4000.50", currency: "ILS" }]);
+    });
+
+    test("sets it for the month in the address, not the current one", async ({ page }) => {
+      const { userId } = await setUp(page);
+      const lastMonth = addMonths(thisMonth(), -1);
+      await page.goto(`/budget?month=${lastMonth}`);
+
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+      await expect(dialog(page)).toContainText(formatMonth(lastMonth));
+      await dialog(page).getByLabel(/Limit for the month/).fill("900");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+
+      await expect(dialog(page)).toHaveCount(0);
+      expect(await monthlyBudgetsOf(userId)).toMatchObject([{ month: lastMonth, limit: "900.00" }]);
+    });
+
+    test("keeps it after a reload", async ({ page }) => {
+      await setUp(page);
+      await page.goto("/budget");
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+      await dialog(page).getByLabel(/Limit for the month/).fill("4000");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+      await expectReadable(figure(page, "Monthly limit"), "4,000 ₪");
+
+      await page.reload();
+
+      await expectReadable(figure(page, "Monthly limit"), "4,000 ₪");
+    });
+
+    test("changes the limit of an existing monthly budget instead of adding a second one", async ({ page }) => {
+      const { userId } = await setUp(page);
+      await seedMonthlyBudget(userId, thisMonth(), 4000);
+      await page.goto("/budget");
+
+      await monthly(page).getByRole("button", { name: "Edit monthly budget" }).click();
+
+      await expect(dialog(page).getByRole("heading", { name: "Edit monthly budget" })).toBeVisible();
+      await expect(dialog(page).getByLabel(/Limit for the month/)).toHaveValue("4000");
+      await dialog(page).getByLabel(/Limit for the month/).fill("4500");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+
+      await expect(dialog(page)).toHaveCount(0);
+      await expectReadable(figure(page, "Monthly limit"), "4,500 ₪");
+      expect(await monthlyBudgetsOf(userId)).toMatchObject([{ limit: "4500.00" }]);
+    });
+
+    test("turns the over-budget state on and off as the limit changes", async ({ page }) => {
+      const { userId, groceries } = await setUp(page);
+      const month = thisMonth();
+      await seedMonthlyBudget(userId, month, 500);
+      await seedTransaction(userId, groceries, { description: "Shop", amount: 650, date: day(month, 4) });
+      await page.goto("/budget");
+      await expect(monthly(page).getByText("You are over your monthly budget.")).toBeVisible();
+
+      await monthly(page).getByRole("button", { name: "Edit monthly budget" }).click();
+      await dialog(page).getByLabel(/Limit for the month/).fill("1000");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+
+      await expect(dialog(page)).toHaveCount(0);
+      await expect(monthly(page).getByText("You are over your monthly budget.")).toHaveCount(0);
+      await expectReadable(figure(page, "Left to spend"), "350 ₪");
+    });
+
+    test("every opening of the form starts fresh, and cancelling saves nothing", async ({ page }) => {
+      const { userId } = await setUp(page);
+      await page.goto("/budget");
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+      await dialog(page).getByLabel(/Limit for the month/).fill("777");
+      await dialog(page).getByRole("button", { name: "Cancel" }).click();
+      await expect(dialog(page)).toHaveCount(0);
+
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+
+      await expect(dialog(page).getByLabel(/Limit for the month/)).toHaveValue("");
+      expect(await monthlyBudgetsOf(userId)).toEqual([]);
+    });
+
+    test("the browser stops an empty limit before it reaches the server", async ({ page }) => {
+      const { userId } = await setUp(page);
+      await page.goto("/budget");
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+
+      await expect(dialog(page).getByLabel(/Limit for the month/)).toBeFocused();
+      expect(await monthlyBudgetsOf(userId)).toEqual([]);
+    });
+
+    test("shows the server's validation error next to the field and keeps what was typed", async ({ page }) => {
+      const { userId } = await setUp(page);
+      await page.goto("/budget");
+      await monthly(page).getByRole("button", { name: "Set monthly budget" }).click();
+      await skipBrowserValidation(page);
+
+      await dialog(page).getByLabel(/Limit for the month/).fill("0");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+
+      await expect(dialog(page).getByText("Amount must be greater than zero")).toBeVisible();
+      await expect(dialog(page).getByLabel(/Limit for the month/)).toHaveAttribute("aria-invalid", "true");
+      expect(await monthlyBudgetsOf(userId)).toEqual([]);
+
+      await dialog(page).getByLabel(/Limit for the month/).fill("1.234");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+      await expect(dialog(page).getByText("Enter an amount like 12.50")).toBeVisible();
+      await expect(dialog(page).getByLabel(/Limit for the month/)).toHaveValue("1.234");
+
+      await dialog(page).getByLabel(/Limit for the month/).fill("1.23");
+      await dialog(page).getByRole("button", { name: "Save" }).click();
+      await expect(dialog(page)).toHaveCount(0);
+      await expectReadable(figure(page, "Monthly limit"), "1.23 ₪");
+    });
+  });
+
+  test.describe("removing it", () => {
+    test("asks first, then removes it but not the category budgets or the transactions", async ({ page }) => {
+      const { userId, groceries } = await setUp(page);
+      const month = thisMonth();
+      await seedMonthlyBudget(userId, month, 4000);
+      await seedBudget(userId, groceries, month, 1200);
+      await seedTransaction(userId, groceries, { description: "Shop", amount: 300, date: day(month, 4) });
+      await page.goto("/budget");
+
+      await monthly(page).getByRole("button", { name: "Remove monthly budget" }).click();
+
+      await expect(dialog(page).getByRole("heading", { name: "Remove monthly budget?" })).toBeVisible();
+      await expect(dialog(page)).toContainText(formatMonth(month));
+      await expect(dialog(page)).toContainText("4,000");
+      await expect(dialog(page)).toContainText("Your category budgets and transactions are not affected.");
+      await dialog(page).getByRole("button", { name: "Remove", exact: true }).click();
+
+      await expect(dialog(page)).toHaveCount(0);
+      await expect(monthly(page).getByText(`No monthly budget for ${formatMonth(month)} yet.`)).toBeVisible();
+      await expectReadable(row(page, "Groceries"), "300 ₪ / 1,200 ₪");
+      expect(await monthlyBudgetsOf(userId)).toEqual([]);
+      expect(await budgetsOf(userId)).toHaveLength(1);
+      expect(await transactionsOf(userId)).toHaveLength(1);
+    });
+
+    test("keeps it when cancelled", async ({ page }) => {
+      const { userId } = await setUp(page);
+      await seedMonthlyBudget(userId, thisMonth(), 4000);
+      await page.goto("/budget");
+
+      await monthly(page).getByRole("button", { name: "Remove monthly budget" }).click();
+      await dialog(page).getByRole("button", { name: "Cancel" }).click();
+
+      await expect(dialog(page)).toHaveCount(0);
+      await expectReadable(figure(page, "Monthly limit"), "4,000 ₪");
+      expect(await monthlyBudgetsOf(userId)).toHaveLength(1);
+    });
+
+    test("says so when it was already removed elsewhere, then refreshes the page", async ({ page }) => {
+      const { userId } = await setUp(page);
+      const id = await seedMonthlyBudget(userId, thisMonth(), 4000);
+      await page.goto("/budget");
+      await monthly(page).getByRole("button", { name: "Remove monthly budget" }).click();
+      await removeMonthlyBudgetRow(id);
+
+      await dialog(page).getByRole("button", { name: "Remove", exact: true }).click();
+
+      await expect(dialog(page).getByRole("alert")).toContainText("no longer exists");
+      await dialog(page).getByRole("button", { name: "Cancel" }).click();
+      await expect(dialog(page)).toHaveCount(0);
+      await expect(monthly(page).getByText(/No monthly budget for/)).toBeVisible();
+    });
   });
 });
 

@@ -2,7 +2,13 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 
 vi.mock("next/headers", async () => (await import("./cookie-jar")).nextHeadersMock);
 
-import { deleteBudget, getBudgetOverview, setBudget } from "@/lib/data/budgets";
+import {
+  deleteBudget,
+  deleteGeneralBudget,
+  getBudgetOverview,
+  setBudget,
+  setGeneralBudget,
+} from "@/lib/data/budgets";
 import { prisma } from "@/lib/prisma";
 import { appError } from "../setup/app-error";
 import { createUser, deleteTestUsers, signInAs, signOut } from "./support";
@@ -364,5 +370,247 @@ describe("a category with budgets", () => {
       ...appError("IN_USE"),
       details: { transactions: 0, budgets: 2 },
     });
+  });
+});
+
+const general = (limit: number | string, month = "2026-10") => ({ month, limit: Number(limit), currency: "ILS" as const });
+const monthlyBudgetsOf = (userId: string) => prisma.monthlyBudget.findMany({ where: { userId } });
+
+describe("the general (monthly) budget", () => {
+  describe("in the overview", () => {
+    it("is null until one is set, and the month's total spending is there anyway", async () => {
+      await spend([{ category: food, amount: 120, date: "2026-10-04" }]);
+
+      const result = await overview();
+
+      expect(result.general).toBeNull();
+      expect(result.totalSpent).toBe(120);
+    });
+
+    it("has the limit, and what is left of it", async () => {
+      await setGeneralBudget(general("4000.50"));
+      await spend([
+        { category: food, amount: "430.25", date: "2026-10-04" },
+        { category: rent, amount: 2400, date: "2026-10-02" },
+      ]);
+
+      const result = await overview();
+
+      expect(result.totalSpent).toBe(2830.25);
+      expect(result.general).toEqual({
+        budgetId: expect.any(String),
+        limit: 4000.5,
+        currency: "ILS",
+        remaining: 1170.25,
+      });
+    });
+
+    it("counts every expense against it: budgeted categories, categories without a budget, and none", async () => {
+      await setGeneralBudget(general(1000));
+      await setBudget({ categoryId: food, month: "2026-10", limit: 300, currency: "ILS" });
+      await spend([
+        { category: food, amount: 100, date: "2026-10-04" },
+        { category: fun, amount: 50, date: "2026-10-05" },
+      ]);
+
+      const result = await overview();
+
+      expect(result.totalSpent).toBe(150);
+      expect(result.budgetedSpent).toBe(100);
+      expect(result.unbudgetedSpent).toBe(50);
+      expect(result.general?.remaining).toBe(850);
+    });
+
+    it("isn't changed by income: only expenses use it up", async () => {
+      await setGeneralBudget(general(1000));
+      await spend([
+        { category: food, amount: 100, date: "2026-10-04" },
+        { category: salary, type: "INCOME", amount: 7200, date: "2026-10-01" },
+      ]);
+
+      const result = await overview();
+
+      expect(result.totalSpent).toBe(100);
+      expect(result.general?.remaining).toBe(900);
+    });
+
+    it("only counts the month shown, from its first day to its last, and only ILS", async () => {
+      await setGeneralBudget(general(1000));
+      await spend([
+        { category: food, amount: 1, date: "2026-09-30" },
+        { category: food, amount: 10, date: "2026-10-01" },
+        { category: food, amount: 100, date: "2026-10-31" },
+        { category: food, amount: 1000, date: "2026-11-01" },
+        { category: food, amount: 5000, date: "2026-10-15", currency: "USD" },
+      ]);
+
+      const result = await overview();
+
+      expect(result.totalSpent).toBe(110);
+      expect(result.general?.remaining).toBe(890);
+    });
+
+    it("goes negative when the month's spending passes it, and is exactly zero when it matches", async () => {
+      await setGeneralBudget(general(100));
+      await spend([{ category: food, amount: "100.01", date: "2026-10-04" }]);
+      expect((await overview()).general?.remaining).toBe(-0.01);
+
+      await prisma.transaction.deleteMany({ where: { userId: alice.id } });
+      await spend([{ category: food, amount: 100, date: "2026-10-04" }]);
+      expect((await overview()).general?.remaining).toBe(0);
+    });
+
+    it("works out the remainder exactly, to the cent", async () => {
+      await setGeneralBudget(general("1000.10"));
+      await spend([
+        { category: food, amount: "0.10", date: "2026-10-02" },
+        { category: food, amount: "0.20", date: "2026-10-03" },
+      ]);
+
+      const result = await overview();
+
+      expect(result.totalSpent).toBe(0.3);
+      expect(result.general?.remaining).toBe(999.8);
+    });
+
+    it("is kept apart for each month", async () => {
+      await setGeneralBudget(general(900, "2026-09"));
+      await setGeneralBudget(general(1100, "2026-10"));
+
+      expect((await overview("2026-09")).general?.limit).toBe(900);
+      expect((await overview("2026-10")).general?.limit).toBe(1100);
+      expect((await overview("2026-11")).general).toBeNull();
+    });
+
+    it("is independent of the category budgets: neither changes the other", async () => {
+      await setGeneralBudget(general(1000));
+      await setBudget({ categoryId: food, month: "2026-10", limit: 4000, currency: "ILS" });
+
+      const withBoth = await overview();
+      expect(withBoth.general?.limit).toBe(1000);
+      // The category budgets may add up to more than the general one
+      expect(withBoth.totalBudget).toBe(4000);
+
+      await deleteBudget(withBoth.rows.find((r) => r.categoryId === food)!.budgetId!);
+      const generalOnly = await overview();
+      expect(generalOnly.general?.limit).toBe(1000);
+      expect(generalOnly.totalBudget).toBe(0);
+
+      await deleteGeneralBudget(withBoth.general!.budgetId);
+      expect((await overview()).general).toBeNull();
+    });
+
+    it("doesn't need any category", async () => {
+      await signInAs(bob);
+
+      await setGeneralBudget(general(500));
+
+      const result = await overview();
+      expect(result.rows).toEqual([]);
+      expect(result.general).toMatchObject({ limit: 500, remaining: 500 });
+    });
+
+    it("only shows the signed-in user's", async () => {
+      await setGeneralBudget(general(1000));
+      await signInAs(bob);
+      await setGeneralBudget(general(50));
+      const bobFood = await category(bob.id, "Food", "EXPENSE");
+      await spend([{ userId: bob.id, category: bobFood, amount: 7, date: "2026-10-04" }]);
+
+      expect((await overview()).general).toMatchObject({ limit: 50, remaining: 43 });
+      await signInAs(alice);
+      expect((await overview()).general).toMatchObject({ limit: 1000, remaining: 1000 });
+    });
+
+    it("is plain data that can be sent to the browser", async () => {
+      await setGeneralBudget(general("1000.50"));
+
+      const result = await overview();
+
+      expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+      expect(typeof result.general?.limit).toBe("number");
+      expect(typeof result.general?.remaining).toBe("number");
+    });
+  });
+
+  describe("setGeneralBudget", () => {
+    it("creates a budget owned by the signed-in user, for the first day of the month, with the exact limit", async () => {
+      await setGeneralBudget(general("4000.50"));
+
+      const [row] = await monthlyBudgetsOf(alice.id);
+      expect(row).toMatchObject({ currency: "ILS" });
+      expect(row.limit.toString()).toBe("4000.5");
+      expect(row.month.toISOString()).toBe("2026-10-01T00:00:00.000Z");
+      expect(await monthlyBudgetsOf(bob.id)).toEqual([]);
+    });
+
+    it("changes the limit when the month already has one, instead of adding a second", async () => {
+      await setGeneralBudget(general(1000));
+      await setGeneralBudget(general(1500));
+
+      const rows = await monthlyBudgetsOf(alice.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].limit.toString()).toBe("1500");
+    });
+
+    it("doesn't touch the category budgets", async () => {
+      await setBudget({ categoryId: food, month: "2026-10", limit: 300, currency: "ILS" });
+
+      await setGeneralBudget(general(1000));
+
+      expect(await prisma.budget.count({ where: { userId: alice.id } })).toBe(1);
+    });
+
+    it("sends signed-out callers to /login", async () => {
+      signOut();
+
+      await expect(setGeneralBudget(general(1000))).rejects.toMatchObject({
+        digest: expect.stringContaining("/login"),
+      });
+      expect(await prisma.monthlyBudget.count()).toBe(0);
+    });
+  });
+
+  describe("deleteGeneralBudget", () => {
+    it("removes it, and not the category budgets or the transactions", async () => {
+      await setGeneralBudget(general(1000));
+      await setBudget({ categoryId: food, month: "2026-10", limit: 300, currency: "ILS" });
+      await spend([{ category: food, amount: 100, date: "2026-10-04" }]);
+      const { general: existing } = await overview();
+
+      await deleteGeneralBudget(existing!.budgetId);
+
+      expect(await monthlyBudgetsOf(alice.id)).toEqual([]);
+      expect(await prisma.budget.count({ where: { userId: alice.id } })).toBe(1);
+      expect(await prisma.transaction.count({ where: { userId: alice.id } })).toBe(1);
+    });
+
+    it("can't remove another user's, even with its id", async () => {
+      await signInAs(bob);
+      await setGeneralBudget(general(50));
+      const bobsId = (await overview()).general!.budgetId;
+      await signInAs(alice);
+
+      await expect(deleteGeneralBudget(bobsId)).rejects.toMatchObject(appError("NOT_FOUND"));
+
+      expect(await monthlyBudgetsOf(bob.id)).toHaveLength(1);
+    });
+
+    it("reports a monthly budget that doesn't exist, including one that was already removed", async () => {
+      await setGeneralBudget(general(1000));
+      const { budgetId } = (await overview()).general!;
+      await deleteGeneralBudget(budgetId);
+
+      await expect(deleteGeneralBudget(budgetId)).rejects.toMatchObject(appError("NOT_FOUND"));
+      await expect(deleteGeneralBudget("missing")).rejects.toMatchObject(appError("NOT_FOUND"));
+    });
+  });
+
+  it("goes away with its user", async () => {
+    await setGeneralBudget(general(1000));
+
+    await prisma.user.delete({ where: { id: alice.id } });
+
+    expect(await prisma.monthlyBudget.count({ where: { userId: alice.id } })).toBe(0);
   });
 });

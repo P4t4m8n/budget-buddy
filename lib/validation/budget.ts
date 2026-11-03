@@ -14,3 +14,10 @@ export const budgetInputSchema = z.object({
 });
 
 export type BudgetInput = z.infer<typeof budgetInputSchema>;
+
+// The general budget has no category: it is for the whole month
+export const generalBudgetInputSchema = budgetInputSchema.omit({
+  categoryId: true,
+});
+
+export type GeneralBudgetInput = z.infer<typeof generalBudgetInputSchema>;

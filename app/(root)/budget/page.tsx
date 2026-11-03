@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import BudgetProgressList from "@/components/budget/BudgetProgressList";
 import BudgetVsSpentChart from "@/components/budget/BudgetVsSpentChart";
+import GeneralBudgetCard from "@/components/budget/GeneralBudgetCard";
 import MonthNav from "@/components/budget/MonthNav";
 import SummaryCard from "@/components/dashboard/SummaryCard";
 import PageHeader from "@/components/layout/PageHeader";
@@ -23,6 +24,8 @@ async function BudgetContent({
     totalBudget,
     budgetedSpent,
     unbudgetedSpent,
+    totalSpent,
+    general,
   } = await getBudgetOverview({
     month: typeof requested === "string" ? requested : undefined,
   });
@@ -38,6 +41,14 @@ async function BudgetContent({
     <>
       <MonthNav month={month} thisMonth={thisMonth} />
 
+      <GeneralBudgetCard
+        general={general}
+        month={month}
+        totalSpent={totalSpent}
+        allocated={totalBudget}
+      />
+
+      <h2 className="mb-4 text-lg font-semibold">Category budgets</h2>
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/15 p-6 text-sm text-neutral-400">
           Budgets are set per expense category.{" "}
@@ -108,7 +119,7 @@ export default function BudgetPage({
     <>
       <PageHeader
         title="Budget"
-        description="Plan your monthly budget per category"
+        description="Plan your monthly budget, overall and per category"
       />
       <Suspense
         fallback={<div className="h-96 animate-pulse rounded-xl bg-neutral-900" />}

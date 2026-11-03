@@ -5,7 +5,7 @@ import { APP_TIME_ZONE, BASE_CURRENCY } from "@/lib/constants";
 import { currentMonth, monthBounds, parseMonth } from "@/lib/dates";
 import { AppError } from "@/lib/errors/app-error";
 import { prisma } from "@/lib/prisma";
-import type { BudgetInput } from "@/lib/validation/budget";
+import type { BudgetInput, GeneralBudgetInput } from "@/lib/validation/budget";
 import type { BudgetOverview, BudgetRow } from "@/types/budget";
 import { toAppError } from "./prisma-errors";
 import { fromDateString, toNumber } from "./serialize";
@@ -35,7 +35,7 @@ export const getBudgetOverview = async (
   const month = parseMonth(options.month) ?? thisMonth;
   const { start, end } = monthBounds(month);
 
-  const [categories, budgets, spendingRows] = await Promise.all([
+  const [categories, budgets, spendingRows, generalBudget] = await Promise.all([
     prisma.category.findMany({
       where: { userId: user.id, type: "EXPENSE" },
       select: { id: true, name: true, color: true },
@@ -54,6 +54,10 @@ export const getBudgetOverview = async (
         date: { gte: fromDateString(start), lt: fromDateString(end) },
       },
       _sum: { amount: true },
+    }),
+    prisma.monthlyBudget.findUnique({
+      where: { userId_month: { userId: user.id, month: fromDateString(start) } },
+      select: { id: true, limit: true, currency: true },
     }),
   ]);
 
@@ -91,6 +95,13 @@ export const getBudgetOverview = async (
   // Budgeted categories first; each group stays sorted by name
   rows.sort((a, b) => Number(b.budgetId !== null) - Number(a.budgetId !== null));
 
+  // Every expense counts against the general budget, including any in a category that
+  // isn't listed above
+  const totalSpent = spendingRows.reduce(
+    (sum, row) => sum.plus(row._sum.amount ?? zero()),
+    zero(),
+  );
+
   return {
     month,
     thisMonth,
@@ -98,6 +109,13 @@ export const getBudgetOverview = async (
     totalBudget: toNumber(totalBudget),
     budgetedSpent: toNumber(budgetedSpent),
     unbudgetedSpent: toNumber(unbudgetedSpent),
+    totalSpent: toNumber(totalSpent),
+    general: generalBudget && {
+      budgetId: generalBudget.id,
+      limit: toNumber(generalBudget.limit),
+      currency: generalBudget.currency,
+      remaining: toNumber(generalBudget.limit.minus(totalSpent)),
+    },
   };
 };
 
@@ -145,4 +163,32 @@ export const deleteBudget = async (id: string): Promise<void> => {
     where: { id, userId: user.id },
   });
   if (count === 0) throw AppError.notFound("budget");
+};
+
+// Creates the month's general budget, or changes its limit when there is one already
+export const setGeneralBudget = async (
+  input: GeneralBudgetInput,
+): Promise<void> => {
+  const user = await requireUser();
+  const month = fromDateString(`${input.month}-01`);
+
+  await prisma.monthlyBudget.upsert({
+    where: { userId_month: { userId: user.id, month } },
+    create: {
+      userId: user.id,
+      month,
+      limit: input.limit,
+      currency: input.currency,
+    },
+    update: { limit: input.limit, currency: input.currency },
+  });
+};
+
+export const deleteGeneralBudget = async (id: string): Promise<void> => {
+  const user = await requireUser();
+
+  const { count } = await prisma.monthlyBudget.deleteMany({
+    where: { id, userId: user.id },
+  });
+  if (count === 0) throw AppError.notFound("monthly budget");
 };

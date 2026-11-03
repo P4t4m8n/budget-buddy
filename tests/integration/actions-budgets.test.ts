@@ -4,7 +4,12 @@ vi.mock("next/headers", async () => (await import("./cookie-jar")).nextHeadersMo
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { revalidatePath } from "next/cache";
-import { deleteBudgetAction, setBudgetAction } from "@/actions/budgets";
+import {
+  deleteBudgetAction,
+  deleteGeneralBudgetAction,
+  setBudgetAction,
+  setGeneralBudgetAction,
+} from "@/actions/budgets";
 import { prisma } from "@/lib/prisma";
 import { createUser, deleteTestUsers, signInAs, signOut } from "./support";
 
@@ -115,7 +120,75 @@ describe("budget Server Actions against the database", () => {
 
     await expect(setBudgetAction(idle, budgetForm())).rejects.toMatchObject(toLogin);
     await expect(deleteBudgetAction("any")).rejects.toMatchObject(toLogin);
+    await expect(setGeneralBudgetAction(idle, generalForm())).rejects.toMatchObject(toLogin);
+    await expect(deleteGeneralBudgetAction("any")).rejects.toMatchObject(toLogin);
     expect(revalidatePath).not.toHaveBeenCalled();
     expect(await prisma.budget.count()).toBe(0);
+    expect(await prisma.monthlyBudget.count()).toBe(0);
+  });
+});
+
+const generalForm = (overrides: Record<string, string> = {}) =>
+  form({ month: "2026-10", limit: "4000.50", ...overrides });
+
+const monthlyBudgetsOf = (userId: string) => prisma.monthlyBudget.findMany({ where: { userId } });
+
+describe("monthly budget Server Actions against the database", () => {
+  it("sets the monthly budget for the signed-in user with the exact limit", async () => {
+    expect(await setGeneralBudgetAction(idle, generalForm())).toEqual({ status: "success" });
+
+    const [row] = await monthlyBudgetsOf(alice.id);
+    expect(row.currency).toBe("ILS");
+    expect(row.limit.toString()).toBe("4000.5");
+    expect(row.month.toISOString()).toBe("2026-10-01T00:00:00.000Z");
+    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith("/budget");
+  });
+
+  it("changes the limit when setting it again", async () => {
+    await setGeneralBudgetAction(idle, generalForm({ limit: "1000" }));
+    await setGeneralBudgetAction(idle, generalForm({ limit: "1500" }));
+
+    const rows = await monthlyBudgetsOf(alice.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].limit.toString()).toBe("1500");
+  });
+
+  it("ignores a userId, id, category or currency in the form data", async () => {
+    await setGeneralBudgetAction(
+      idle,
+      generalForm({ userId: bob.id, id: "chosen-id", categoryId: aliceFood, currency: "USD" }),
+    );
+
+    expect(await monthlyBudgetsOf(bob.id)).toEqual([]);
+    const [row] = await monthlyBudgetsOf(alice.id);
+    expect(row.id).not.toBe("chosen-id");
+    expect(row.currency).toBe("ILS");
+    expect(await budgetsOf(alice.id)).toEqual([]);
+  });
+
+  it("saves nothing when validation fails", async () => {
+    const result = await setGeneralBudgetAction(idle, generalForm({ limit: "0", month: "2026-13" }));
+
+    expect(result.status).toBe("error");
+    expect(Object.keys(result.fieldErrors ?? {}).sort()).toEqual(["limit", "month"]);
+    expect(await monthlyBudgetsOf(alice.id)).toEqual([]);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("removes one's own monthly budget", async () => {
+    await setGeneralBudgetAction(idle, generalForm());
+    const [{ id }] = await monthlyBudgetsOf(alice.id);
+
+    expect(await deleteGeneralBudgetAction(id)).toEqual({ ok: true });
+    expect(await monthlyBudgetsOf(alice.id)).toEqual([]);
+  });
+
+  it("can't remove another user's monthly budget, even with its id", async () => {
+    await setGeneralBudgetAction(idle, generalForm());
+    const [{ id }] = await monthlyBudgetsOf(alice.id);
+    await signInAs(bob);
+
+    expect(await deleteGeneralBudgetAction(id)).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+    expect(await monthlyBudgetsOf(alice.id)).toHaveLength(1);
   });
 });

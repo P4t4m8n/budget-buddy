@@ -1,10 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { deleteBudget, setBudget } from "@/lib/data/budgets";
+import {
+  deleteBudget,
+  deleteGeneralBudget,
+  setBudget,
+  setGeneralBudget,
+} from "@/lib/data/budgets";
 import { AppError, type ActionResult } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
-import { budgetInputSchema } from "@/lib/validation/budget";
+import {
+  budgetInputSchema,
+  generalBudgetInputSchema,
+} from "@/lib/validation/budget";
 import {
   readFormValues,
   validationFailure,
@@ -15,6 +23,49 @@ const FIELDS = ["categoryId", "month", "limit"] as const;
 type Field = (typeof FIELDS)[number];
 
 export type BudgetFormState = FormState<Field>;
+
+const GENERAL_FIELDS = ["month", "limit"] as const;
+type GeneralField = (typeof GENERAL_FIELDS)[number];
+
+export type GeneralBudgetFormState = FormState<GeneralField>;
+
+// Setting the general budget creates it or changes its limit, so there is one action for both
+export const setGeneralBudgetAction = async (
+  _previous: GeneralBudgetFormState,
+  formData: FormData,
+): Promise<GeneralBudgetFormState> => {
+  const values = readFormValues(formData, GENERAL_FIELDS);
+  const parsed = generalBudgetInputSchema.safeParse(values);
+  if (!parsed.success) return validationFailure(parsed.error, values);
+
+  try {
+    await setGeneralBudget(parsed.data);
+  } catch (error) {
+    return formFailure(error, values);
+  }
+
+  revalidatePath("/budget");
+  return { status: "success" };
+};
+
+// No revalidatePath when this fails with NOT_FOUND, for the same reason as deleteBudgetAction
+export const deleteGeneralBudgetAction = async (
+  id: string,
+): Promise<ActionResult> => {
+  // Server Actions are public endpoints: never trust the argument's type
+  if (typeof id !== "string" || id === "") {
+    return actionFailure(AppError.notFound("monthly budget"));
+  }
+
+  try {
+    await deleteGeneralBudget(id);
+  } catch (error) {
+    return actionFailure(error);
+  }
+
+  revalidatePath("/budget");
+  return { ok: true };
+};
 
 // Setting a budget creates it or changes its limit, so there is one action for both
 export const setBudgetAction = async (
