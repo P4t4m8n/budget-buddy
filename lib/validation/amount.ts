@@ -3,8 +3,13 @@ import { z } from "zod";
 const AMOUNT_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
 const AMOUNT_MESSAGE = "Enter an amount like 12.50";
 
+// A missing value reads as empty, so it gets the same friendly message as a blank field
 const asText = (value: unknown) =>
-  typeof value === "number" ? String(value) : value;
+  typeof value === "number"
+    ? String(value)
+    : value === undefined || value === null
+      ? ""
+      : value;
 
 // Up to 10 digits and 2 decimals: exactly what Decimal(12, 2) can store.
 // Checked on the text so values like 0.1 + 0.2 never reach the database.

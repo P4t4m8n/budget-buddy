@@ -44,6 +44,7 @@ describe("AppError", () => {
     [AppError.duplicate("Taken", "name"), "DUPLICATE", "Taken"],
     [AppError.inUse("In use", { transactions: 2 }), "IN_USE", "In use"],
     [AppError.invalidReference("Pick another", "categoryId"), "INVALID_REFERENCE", "Pick another"],
+    [AppError.invalidInput("Row 2: Enter a valid date"), "INVALID_INPUT", "Row 2: Enter a valid date"],
     [AppError.authFailed("Bad token"), "AUTH_FAILED", "Bad token"],
   ])("has a factory for %s", (error, code, message) => {
     expect(error).toBeInstanceOf(AppError);

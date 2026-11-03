@@ -6,6 +6,7 @@ export type AppErrorCode =
   | "DUPLICATE" // it would collide with something that already exists
   | "IN_USE" // it can't be removed while something still depends on it
   | "INVALID_REFERENCE" // it points at something that doesn't exist, isn't theirs, or doesn't fit
+  | "INVALID_INPUT" // what was submitted isn't acceptable, for a reason that isn't a single form field
   | "AUTH_FAILED"; // sign-in was rejected
 
 type AppErrorOptions = {
@@ -48,6 +49,9 @@ export class AppError extends Error {
 
   static invalidReference = (message: string, field?: string) =>
     new AppError("INVALID_REFERENCE", message, { field });
+
+  static invalidInput = (message: string) =>
+    new AppError("INVALID_INPUT", message);
 
   static authFailed = (message: string) =>
     new AppError("AUTH_FAILED", message);

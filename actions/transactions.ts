@@ -3,16 +3,18 @@
 import { revalidatePath } from "next/cache";
 import {
   createTransaction,
+  createTransactions,
   deleteTransaction,
   updateTransaction,
 } from "@/lib/data/transactions";
-import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { AppError, type ActionFailure, type ActionResult } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   readFormValues,
   validationFailure,
   type FormState,
 } from "@/lib/validation/form";
+import { importInputSchema } from "@/lib/validation/transaction-import";
 import { transactionInputSchema } from "@/lib/validation/transaction";
 
 const FIELDS = ["description", "amount", "type", "categoryId", "date", "note"] as const;
@@ -84,4 +86,34 @@ export const deleteTransactionAction = async (
 
   refreshTransactionPages();
   return { ok: true };
+};
+
+export type ImportResult = { ok: true; count: number } | ActionFailure;
+
+// Adds the rows of an imported file, each with the category the user chose for it, as
+// expenses. All of them or none. The browser has already checked every row, but this is a
+// public endpoint, so everything is checked again.
+export const importTransactionsAction = async (
+  rows: unknown,
+): Promise<ImportResult> => {
+  const parsed = importInputSchema.safeParse(rows);
+  if (!parsed.success) {
+    const [issue] = parsed.error.issues;
+    const row = typeof issue.path[0] === "number" ? issue.path[0] + 1 : null;
+    return actionFailure(
+      AppError.invalidInput(row === null ? issue.message : `Row ${row}: ${issue.message}`),
+    );
+  }
+
+  let count: number;
+  try {
+    count = await createTransactions(parsed.data);
+  } catch (error) {
+    return actionFailure(error);
+  }
+
+  // Imported expenses also change the dashboard and the month's budgets
+  refreshTransactionPages();
+  revalidatePath("/budget");
+  return { ok: true, count };
 };

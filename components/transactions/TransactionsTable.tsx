@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/format";
 import { transactionTypeLabels } from "@/lib/labels";
 import type { Category, TransactionType } from "@/types/finance";
 import DeleteTransactionDialog from "./DeleteTransactionDialog";
+import ImportDialog from "./import/ImportDialog";
 import TransactionFormDialog from "./TransactionFormDialog";
 import type { TransactionRow } from "./transaction-row";
 
@@ -29,6 +30,7 @@ export default function TransactionsTable({
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<DialogState>(closed);
   const [removal, setRemoval] = useState<DialogState>(closed);
+  const [importing, setImporting] = useState(false);
   const typeLabelId = useId();
   const categoryLabelId = useId();
 
@@ -98,6 +100,10 @@ export default function TransactionsTable({
   );
 
   const hasCategories = categories.length > 0;
+  const expenseCategories = useMemo(
+    () => categories.filter((category) => category.type === "EXPENSE"),
+    [categories],
+  );
 
   return (
     <div>
@@ -149,13 +155,27 @@ export default function TransactionsTable({
             />
           </FormField>
         </div>
-        <Button
-          className="ml-auto"
-          disabled={!hasCategories}
-          onClick={() => setForm({ open: true })}
-        >
-          Add transaction
-        </Button>
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="ghost"
+            className="border border-white/15"
+            disabled={expenseCategories.length === 0}
+            title={
+              expenseCategories.length === 0
+                ? "Create an expense category first"
+                : undefined
+            }
+            onClick={() => setImporting(true)}
+          >
+            Import from file
+          </Button>
+          <Button
+            disabled={!hasCategories}
+            onClick={() => setForm({ open: true })}
+          >
+            Add transaction
+          </Button>
+        </div>
       </div>
 
       <DataGrid
@@ -180,6 +200,11 @@ export default function TransactionsTable({
         open={removal.open}
         transaction={removal.row}
         onClose={() => setRemoval((current) => ({ ...current, open: false }))}
+      />
+      <ImportDialog
+        open={importing}
+        categories={expenseCategories}
+        onClose={() => setImporting(false)}
       />
     </div>
   );
