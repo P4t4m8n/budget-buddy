@@ -29,6 +29,12 @@ type GeneralField = (typeof GENERAL_FIELDS)[number];
 
 export type GeneralBudgetFormState = FormState<GeneralField>;
 
+// The dashboard shows the month's budgets too
+const refreshBudgetPages = () => {
+  revalidatePath("/budget");
+  revalidatePath("/dashboard");
+};
+
 // Setting the general budget creates it or changes its limit, so there is one action for both
 export const setGeneralBudgetAction = async (
   _previous: GeneralBudgetFormState,
@@ -44,7 +50,7 @@ export const setGeneralBudgetAction = async (
     return formFailure(error, values);
   }
 
-  revalidatePath("/budget");
+  refreshBudgetPages();
   return { status: "success" };
 };
 
@@ -63,7 +69,7 @@ export const deleteGeneralBudgetAction = async (
     return actionFailure(error);
   }
 
-  revalidatePath("/budget");
+  refreshBudgetPages();
   return { ok: true };
 };
 
@@ -82,7 +88,7 @@ export const setBudgetAction = async (
     return formFailure(error, values);
   }
 
-  revalidatePath("/budget");
+  refreshBudgetPages();
   return { status: "success" };
 };
 
@@ -103,6 +109,6 @@ export const deleteBudgetAction = async (
     return actionFailure(error);
   }
 
-  revalidatePath("/budget");
+  refreshBudgetPages();
   return { ok: true };
 };
