@@ -7,7 +7,7 @@ import {
   purchaseWishlistItem,
   updateWishlistItem,
 } from "@/lib/data/wishlist";
-import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { AppError } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   readFormValues,
@@ -18,6 +18,7 @@ import {
   purchaseInputSchema,
   wishlistInputSchema,
 } from "@/lib/validation/wishlist";
+import type{ ActionResult } from "@/lib/errors/errors.type";
 
 const FIELDS = ["name", "price", "priority", "status", "url", "notes"] as const;
 type Field = (typeof FIELDS)[number];

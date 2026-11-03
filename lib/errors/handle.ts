@@ -4,8 +4,8 @@ import type { FormState } from "@/lib/validation/form";
 import {
   isAppError,
   serializeError,
-  type ActionFailure,
 } from "./app-error";
+import type{ ActionFailure } from "./errors.type";
 
 // The single place unexpected errors are logged
 export const logUnexpected = (error: unknown) => {

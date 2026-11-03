@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AppErrorCode } from "@/lib/errors/app-error";
+import type { AppErrorCode } from "../errors/errors.type";
 
 // Result of a form Server Action, as read by useActionState
 export type FormState<Field extends string> = {

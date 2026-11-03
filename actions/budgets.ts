@@ -7,7 +7,7 @@ import {
   setBudget,
   setGeneralBudget,
 } from "@/lib/data/budgets";
-import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { AppError } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   budgetInputSchema,
@@ -18,6 +18,7 @@ import {
   validationFailure,
   type FormState,
 } from "@/lib/validation/form";
+import type { ActionResult } from "@/lib/errors/errors.type";
 
 const FIELDS = ["categoryId", "month", "limit"] as const;
 type Field = (typeof FIELDS)[number];
@@ -95,9 +96,7 @@ export const setBudgetAction = async (
 // No revalidatePath when this fails with NOT_FOUND: the refresh would remove the row, and
 // the open dialog with it, before the user could read the message. The dialog refreshes the
 // list when it is closed instead.
-export const deleteBudgetAction = async (
-  id: string,
-): Promise<ActionResult> => {
+export const deleteBudgetAction = async (id: string): Promise<ActionResult> => {
   // Server Actions are public endpoints: never trust the argument's type
   if (typeof id !== "string" || id === "") {
     return actionFailure(AppError.notFound("budget"));

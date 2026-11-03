@@ -7,7 +7,7 @@ import {
   deleteTransaction,
   updateTransaction,
 } from "@/lib/data/transactions";
-import { AppError, type ActionFailure, type ActionResult } from "@/lib/errors/app-error";
+import { AppError } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   readFormValues,
@@ -16,8 +16,16 @@ import {
 } from "@/lib/validation/form";
 import { importInputSchema } from "@/lib/validation/transaction-import";
 import { transactionInputSchema } from "@/lib/validation/transaction";
+import type { ActionFailure, ActionResult } from "@/lib/errors/errors.type";
 
-const FIELDS = ["description", "amount", "type", "categoryId", "date", "note"] as const;
+const FIELDS = [
+  "description",
+  "amount",
+  "type",
+  "categoryId",
+  "date",
+  "note",
+] as const;
 type Field = (typeof FIELDS)[number];
 
 export type TransactionFormState = FormState<Field>;
@@ -26,7 +34,7 @@ export type TransactionFormState = FormState<Field>;
 const refreshTransactionPages = () => {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
-}
+};
 
 // No revalidatePath when an action fails with NOT_FOUND: the refresh would remove the
 // row, and the open dialog with it, before the user could read the message. The dialog
@@ -101,7 +109,9 @@ export const importTransactionsAction = async (
     const [issue] = parsed.error.issues;
     const row = typeof issue.path[0] === "number" ? issue.path[0] + 1 : null;
     return actionFailure(
-      AppError.invalidInput(row === null ? issue.message : `Row ${row}: ${issue.message}`),
+      AppError.invalidInput(
+        row === null ? issue.message : `Row ${row}: ${issue.message}`,
+      ),
     );
   }
 

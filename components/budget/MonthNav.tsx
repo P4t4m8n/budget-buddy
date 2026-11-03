@@ -12,13 +12,12 @@ const link =
 const hrefFor = (month: string, thisMonth: string) =>
   month === thisMonth ? "/budget" : `/budget?month=${month}`;
 
-export default function MonthNav({
-  month,
-  thisMonth,
-}: {
+interface MonthNavProps {
   month: string;
   thisMonth: string;
-}) {
+}
+
+export default function MonthNav({ month, thisMonth }: MonthNavProps) {
   const previous = addMonths(month, -1);
   const next = addMonths(month, 1);
 

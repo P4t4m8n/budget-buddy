@@ -12,12 +12,12 @@ const authSecret = () => {
   return secret;
 };
 
-export const randomToken = (bytes = 32) => {
+export const randomToken = (bytes = 32): string => {
   return randomBytes(bytes).toString("base64url");
 };
 
 // Session tokens are random, so a plain SHA-256 is enough to store them safely
-export const hashToken = (token: string) => {
+export const hashToken = (token: string): string => {
   return createHash("sha256").update(token).digest("hex");
 };
 

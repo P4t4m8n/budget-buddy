@@ -7,7 +7,7 @@ import {
   updateInvestment,
   updateInvestmentValue,
 } from "@/lib/data/investments";
-import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { AppError } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   investmentInputSchema,
@@ -19,6 +19,7 @@ import {
   validationFailure,
   type FormState,
 } from "@/lib/validation/form";
+import type { ActionResult } from "@/lib/errors/errors.type";
 
 const FIELDS = [
   "name",

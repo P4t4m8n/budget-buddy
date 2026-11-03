@@ -1,18 +1,21 @@
 import "server-only";
+
 import { Prisma } from "@/generated/prisma/client";
+
 import { requireUser } from "@/lib/auth/dal";
 import { APP_TIME_ZONE, BASE_CURRENCY } from "@/lib/constants";
 import { currentMonth, monthBounds, parseMonth } from "@/lib/dates";
 import { AppError } from "@/lib/errors/app-error";
 import { prisma } from "@/lib/prisma";
-import type { BudgetInput, GeneralBudgetInput } from "@/lib/validation/budget";
-import type { BudgetOverview, BudgetRow } from "@/types/budget";
+
 import { toAppError } from "./prisma-errors";
 import { fromDateString, toNumber } from "./serialize";
 
+import type { BudgetInput, GeneralBudgetInput } from "@/lib/validation/budget";
+import type { BudgetOverview, BudgetRow } from "@/types/budget";
+
 // Every function resolves the signed-in user itself and scopes all queries to them.
 // Input is expected to be validated already (lib/validation).
-
 const invalidCategory = () =>
   AppError.invalidReference(
     "Choose one of your expense categories",
@@ -62,6 +65,7 @@ export const getBudgetOverview = async (
   ]);
 
   const budgetByCategory = new Map(budgets.map((b) => [b.categoryId, b]));
+  
   const spentByCategory = new Map(
     spendingRows.map((row) => [row.categoryId, row._sum.amount ?? zero()]),
   );

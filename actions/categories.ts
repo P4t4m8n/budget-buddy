@@ -6,7 +6,7 @@ import {
   deleteCategory,
   updateCategory,
 } from "@/lib/data/categories";
-import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { AppError } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   categoryInputSchema,
@@ -17,6 +17,7 @@ import {
   validationFailure,
   type FormState,
 } from "@/lib/validation/form";
+import type { ActionResult } from "@/lib/errors/errors.type";
 
 const FIELDS = ["name", "type", "color"] as const;
 type Field = (typeof FIELDS)[number];

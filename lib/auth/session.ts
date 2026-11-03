@@ -1,7 +1,11 @@
 import "server-only";
+
 import { cookies } from "next/headers";
+
 import { prisma } from "@/lib/prisma";
+
 import { hashToken, randomToken } from "./crypto";
+
 import { SESSION_COOKIE } from "./constants";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -23,7 +27,9 @@ export const createSession = async (userId: string) => {
     data: { userId, tokenHash: hashToken(token), expiresAt },
   });
 
-  (await cookies()).set(SESSION_COOKIE, token, {
+  const cookieStore = await cookies();
+
+  cookieStore.set(SESSION_COOKIE, token, {
     ...cookieOptions,
     expires: expiresAt,
   });

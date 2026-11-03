@@ -9,7 +9,7 @@ import {
   updateDeposit,
   updateGoal,
 } from "@/lib/data/savings";
-import { AppError, type ActionResult } from "@/lib/errors/app-error";
+import { AppError } from "@/lib/errors/app-error";
 import { actionFailure, formFailure } from "@/lib/errors/handle";
 import {
   readFormValues,
@@ -17,6 +17,7 @@ import {
   type FormState,
 } from "@/lib/validation/form";
 import { depositInputSchema, goalInputSchema } from "@/lib/validation/savings";
+import type { ActionResult } from "@/lib/errors/errors.type";
 
 const GOAL_FIELDS = ["name", "targetAmount", "targetDate"] as const;
 type GoalField = (typeof GOAL_FIELDS)[number];
@@ -131,7 +132,9 @@ export const updateDepositAction = async (
   return { status: "success" };
 };
 
-export const deleteDepositAction = async (id: string): Promise<ActionResult> => {
+export const deleteDepositAction = async (
+  id: string,
+): Promise<ActionResult> => {
   if (typeof id !== "string" || id === "") {
     return actionFailure(AppError.notFound("deposit"));
   }
