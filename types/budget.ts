@@ -13,6 +13,7 @@ export type BudgetRow = {
 
 // The general budget for a month: every expense counts against it, whatever its category
 export type GeneralBudget = {
+  
   budgetId: string;
   limit: number;
   currency: Currency;
